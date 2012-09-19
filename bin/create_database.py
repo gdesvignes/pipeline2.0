@@ -47,6 +47,7 @@ creates.append("CREATE TABLE jobs ( " \
                     "details TEXT, " \
                     "id INTEGER PRIMARY KEY, " \
                     "status TEXT, " \
+                    "task TEXT, " \
                     "updated_at TEXT)")
 creates.append("CREATE TABLE requests ( " \
                     "size INTEGER, " \
