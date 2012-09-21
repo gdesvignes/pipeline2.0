@@ -406,7 +406,7 @@ class dedisp_plan:
             self.dmlist.append(dmlist)
 
 
-def main(filenms, workdir, resultsdir, task):
+def main(filenms, workdir, resultsdir, task='all'):
 
     # Change to the specified working directory
     os.chdir(workdir)
@@ -940,4 +940,4 @@ if __name__ == "__main__":
     resultsdir = sys.argv[2]
     task = sys.argv[3]
     filenms = sys.argv[4:]
-    main(filenms, workdir, resultsdir, task='all')
+    main(filenms, workdir, resultsdir, task)
