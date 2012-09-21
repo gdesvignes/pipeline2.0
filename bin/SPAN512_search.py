@@ -99,10 +99,16 @@ def init_workspace():
     if not os.path.isdir(config.processing.base_working_directory):
         print "Creating base work directory..."
         os.makedirs(config.processing.base_working_directory)
+
+    # The scratch space is never the same. It depends on the job number and the queue name
+    # so to get the workdir, first get the current directory, then add the temp dir
+    
+    cwd = os.getcwd()
+ 
     workdir = tempfile.mkdtemp(suffix="_tmp", prefix="SPAN512_processing_", \
-                        dir=config.processing.base_working_directory)
+                        dir=cwd)
     resultsdir = tempfile.mkdtemp(suffix="_tmp", prefix="SPAN512_results_", \
-                        dir=config.processing.base_working_directory)
+                        dir=cwd)
     return (workdir, resultsdir)
 
 
@@ -132,6 +138,7 @@ def set_up():
     print "Searching %d files:" % len(fns)
     outdir = get_outdir()
     task = get_options()
+    print "Task is: ", task
     workdir, resultsdir = init_workspace()
    
     print "Local working directory:", workdir
@@ -198,7 +205,7 @@ def main():
 	tasks2copy = ['search', 'sifting', 'folding']
 	if any(tk2 in task for tk2 in tasks2copy):
 	    copy_intermediate_results(outdir, workdir)
-        search(ppfns, workdir, resultsdir, task)
+        search(wfns, workdir, resultsdir, task)
 
         copy_results(resultsdir, outdir)
     except:
