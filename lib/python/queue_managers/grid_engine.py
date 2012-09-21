@@ -62,7 +62,7 @@ class GEManager(queue_managers.generic_interface.PipelineQueueManager):
                         '{config.basic.pipelinedir}/bin/search.py')
 
             Output:
-                jobid: A unique job identifier.
+                queue_id: A unique queue identifier.
         
             *** NOTE: A pipeline_utils.PipelineError is raised if
                         the queue submission fails.
@@ -90,16 +90,20 @@ class GEManager(queue_managers.generic_interface.PipelineQueueManager):
 	if opts:
 	    opts = ",OPTIONS='%s'"%opts
 
+	if config.basic.use_HPSS:
+	    hpss_opt = ",hpss=1"
+        else: hpss_opt = ""  
+
 	# Submit
-        cmd = "qsub  -V -v DATAFILES='%s',OUTDIR='%s'%s -l ct=%d,vmem=%dM,fsize=%dG -N %s -e %s -o %s %s" %\
-                   (';'.join(datafiles), outdir, opts, cputime, memory, fsize, self.job_basename + str(job_id),\
+        cmd = "qsub  -V -v DATAFILES='%s',OUTDIR='%s'%s -l ct=%d,vmem=%dM,fsize=%dG%s -N %s -e %s -o %s %s" %\
+                   (';'.join(datafiles), outdir, opts, cputime, memory, fsize, hpss_opt, self.job_basename,\
                       errorlog, stdoutlog, script)
 		     
-	if config.basic.use_HPSS:
-	    cmd += " -l hpss=1"
-
         queue_id, error, comm_err = self._exec_check_for_failure(cmd)
-        queue_id = queue_id.strip()
+	try:
+            queue_id = queue_id.split()[2]
+        except:
+            pass
         
         comm_err_count = 0
         comm_err_lim = 10
@@ -138,7 +142,7 @@ class GEManager(queue_managers.generic_interface.PipelineQueueManager):
 
         else:
           tree = ET.XML(output)
-	  job_name = self.job_basename + str(job_id)
+	  job_name = self.job_basename
           queue_id = 0
 
 	  # Loop over all jobs
@@ -276,7 +280,7 @@ class GEManager(queue_managers.generic_interface.PipelineQueueManager):
 
         return (numrunning, numqueued)
 
-    def _get_stderr_path(self, jobid_str):
+    def _get_stderr_path(self, queue_id):
         """A private method not required by the PipelineQueueManager interface.
             Return the path to the error log of the given job, 
             defined by its queue ID.
@@ -291,11 +295,12 @@ class GEManager(queue_managers.generic_interface.PipelineQueueManager):
             NOTE: A ValueError is raised if the error log cannot be found.
         """
 
-        stderr_path = os.path.join(config.basic.qsublog_dir, "%s.e%s" % (self.job_basename, jobid_str))
+        stderr_path = os.path.join(config.basic.qsublog_dir, "%s.e%s" % (self.job_basename, queue_id))
+	print stderr_path
 	                              
         if not os.path.exists(stderr_path):
             raise ValueError("Cannot find error log for job (%s): %s" % \
-                        (jobid_str, stderr_path))
+                        (queue_id, stderr_path))
         return stderr_path
 
     def had_errors(self, queue_id):
@@ -303,7 +308,7 @@ class GEManager(queue_managers.generic_interface.PipelineQueueManager):
             terminated with an error or not.
 
         Input:
-            queue_id: Unique identifier for a job.
+            queue_id: Unique queue's identifier for a job.
         
         Output:
             errors: A boolean value. True if this job terminated with an error.
