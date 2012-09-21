@@ -255,7 +255,7 @@ class obs_info:
             data.update_positions()
         
         spec_info = data.specinfo
-        self.backend = spec_info.backend
+        self.backend = spec_info.backend.lower()
         self.MJD = spec_info.start_MJD[0]
         self.ra_string = spec_info.ra_str
         self.dec_string = spec_info.dec_str
@@ -369,7 +369,7 @@ class dedisp_plan:
     """
     def __init__(self, parameters):
         try:
-            lodm, dmstep, dmsperpass, numpasses, numsub, downsamp = parameters.split()
+            lodm, dmstep, dmsperpass, numpasses, numsub, downsamp = parameters
 	except:
 	    raise 
 
