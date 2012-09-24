@@ -94,9 +94,13 @@ class GEManager(queue_managers.generic_interface.PipelineQueueManager):
 	    hpss_opt = ",hpss=1"
         else: hpss_opt = ""  
 
+	if config.basic.use_sps:
+	    sps_opt = ",sps=1"
+        else: sps_opt = ""  
+
 	# Submit
-        cmd = "qsub  -V -v DATAFILES='%s',OUTDIR='%s'%s -l ct=%d,vmem=%dM,fsize=%dG%s -N %s -e %s -o %s %s" %\
-                   (';'.join(datafiles), outdir, opts, cputime, memory, fsize, hpss_opt, self.job_basename,\
+        cmd = "qsub  -V -v DATAFILES='%s',OUTDIR='%s'%s -l ct=%d,vmem=%dM,fsize=%dG%s%s -N %s -e %s -o %s %s" %\
+                   (';'.join(datafiles), outdir, opts, cputime, memory, fsize, hpss_opt, sps_opt, self.job_basename,\
                       errorlog, stdoutlog, script)
 		     
         queue_id, error, comm_err = self._exec_check_for_failure(cmd)
