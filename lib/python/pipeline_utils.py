@@ -80,6 +80,9 @@ def remove_HPSS_file(fn):
 	Outputs:
 	    None
     """
+    cmd = "rfrm %s"%filename
+    pipe = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, 
+stdin=subprocess.PIPE, stderr=subprocess.PIPE).stdout.read().strip()
 
 
 def remove_file(fn):
@@ -94,7 +97,7 @@ def remove_file(fn):
     """
     import jobtracker
     if config.basic.use_HPSS:
-        # remove_HPSS_file(fn)
+        remove_HPSS_file(fn)
         raise PipelineError("Deletion of HPSS files not implemented yet!")
 
     else:
