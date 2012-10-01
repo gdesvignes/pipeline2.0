@@ -11,6 +11,7 @@ import tempfile
 import shutil
 import subprocess
 import tarfile
+import glob
 
 import datafile
 import astro_utils.calendar
@@ -169,6 +170,10 @@ def copy_zaplist(fns, workdir):
 def copy_intermediate_results(outdir, workdir):
     print "Copying contents of main results directory %s to %s"%(outdir, workdir)
     system_call("rsync -av %s/ %s" % (outdir, workdir))
+    for tarfn in glob.glob("*.tgz"):
+        tf = tarfile.open(tarfn)
+	tf.extractall()
+        
 
 def copy_results(resultsdir, outdir):
     # Copy search results to outdir (only if no errors occurred)

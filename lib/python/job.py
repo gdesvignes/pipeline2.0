@@ -128,7 +128,7 @@ def create_parallel_search_jobs():
 
         # retrieve file_ids
         rows2 = jobtracker.query("SELECT * from job_files " \
-				"WHERE job_id=%d'"%row['job_id'])
+				"WHERE job_id=%d"%row['id'])
 
         files_ids = [str(row2['file_id']) for row2 in rows2]
 
@@ -141,19 +141,23 @@ def create_parallel_search_jobs():
                             "status, " \
                             "task, " \
                             "updated_at) " \
-                       "VALUES ('%s', '%s', '%s', '%s')" % \
+                       "VALUES ('%s', '%s', '%s', '%s', '%s')" % \
                         (jobtracker.nowstr(), 'Newly created job', \
                             'new', task_name, jobtracker.nowstr()))
 
-            for file_id in file_ids:
+	    rows = jobtracker.query("SELECT filename FROM files WHERE id IN ('%s')")
+
+            for file_id in files_ids:
                 queries.append("INSERT INTO job_files (" \
                                 "file_id, " \
                                 "created_at, " \
                                 "job_id, " \
                                 "updated_at) " \
-                           "%d, '%s', (SELECT LAST_INSERT_ROWID()), '%s' " %\
-                           (file_id, jobtracker.nowstr(), jobtracker.nowstr(), \
-                            "', '".join(complete)))
+			       "SELECT id, '%s', (SELECT LAST_INSERT_ROWID()), '%s' " \
+			       "FROM files " \
+			       "WHERE id=%d" % \
+			       (jobtracker.nowstr(), jobtracker.nowstr(), \
+				int(file_id)))
 
 	# Mark the previous task as 'done'
 	queries.append("UPDATE jobs " \
@@ -161,7 +165,7 @@ def create_parallel_search_jobs():
 			   "updated_at='%s', " \
 			   "details='Processed without errors' " \
 			   "WHERE id=%d" % \
-                           (jobtracker.nowstr(), row['job_id']))
+                           (jobtracker.nowstr(), row['id']))
     jobtracker.query(queries)
 			    
     
@@ -174,43 +178,61 @@ def create_sifting_jobs():
     # First make sur that all plans are done
     rows = jobtracker.query("SELECT * from jobs " \
 				"WHERE status='processed' " \
-				"AND 'search' like task")
+				"AND 'search' LIKE task")
     # TODO: how to find out that the parallel task are done ?				
 
     rows = jobtracker.query("SELECT jobs.task, job_files.file_id  FROM jobs " \
                             "LEFT JOIN job_files " \
                             "ON job_files.job_id=jobs.id " \
-                            "WHERE jobs.status='processed' and 'search' LIKE jobs.task")
+                            "WHERE jobs.status='processed' AND 'search' LIKE jobs.task")
 
 
-def check_parallel_jobs(task, rows):
+def check_parallel_jobs():
     # This should go into a new function
     # Now sort the details - Check that all parallel jobs are done
     # TODO: Should find something more clever !!
-    a = {}
-    for row in rows:
-        if a.has_key(row['file_id']):
-	    a[row['file_id']].append(row['task'])
-	else:
-	    a[row['file_id']] = []   
-	    a[row['file_id']].append(row['task'])
+    """
+    Given a specific row,
+        Input: a specific row
+    """
 
-    keys = a.keys()	    
+    rows = jobtracker.query("SELECT jobs.task, jobs.id, job_files.file_id  FROM jobs " \
+                            "LEFT JOIN job_files " \
+                            "ON job_files.job_id=jobs.id " \
+                            "WHERE jobs.status='processed' AND jobs.task LIKE 'search%'")
+
+    Obs = {}
+    Jobs = {}
+    for row in rows:
+        #print row
+        if Obs.has_key(row['file_id']):
+	    Obs[row['file_id']].append(row['task'])
+	    Jobs[row['file_id']].append(row['id'])
+	else:
+	    Obs[row['file_id']] = []   
+	    Obs[row['file_id']].append(row['task'])
+	    Jobs[row['file_id']] = []   
+	    Jobs[row['file_id']].append(row['id'])
+
+    # Sort the file_ids
+    keys = Obs.keys()	    
     keys.sort()
     
     # Expected list of plans
-    plans = ["search %d"%i for i in range(config.searching.ddplans['nuppi'])]
+    plans = ["search %d"%i for i in range(len(config.searching.ddplans['nuppi']))]
 
-    finished_files = []
+    file_ids = []
     for key in keys:
         # Len of the list should be equal to Number of plans
-	finished_plans = [dbplan for dbplan in dbplans if dbplan in plans]
+	finished_plans = [dbplan for dbplan in Obs[key] if dbplan in plans]
 	if len(finished_plans) == len(config.searching.ddplans['nuppi']):
-	    finished_files.append(key)
+	    file_ids.append(key)
+        else: # If not complete, we remove the key
+            Jobs.pop(key)
 	    
 
-    # TODO : Should return the good arrays
-    return finished_files
+    # Should return an array of file_id 
+    return Jobs
         
 
 def create_parallel_folding_jobs():
@@ -218,50 +240,54 @@ def create_parallel_folding_jobs():
 	successive jobs and create
         entries in the jobs table.
     """
-    # Look for job with rfifind done
-    rows = jobtracker.query("SELECT * from jobs " \
-				"WHERE status='processed' " \
-				"AND task='sifting'")
+    Jobs = check_parallel_jobs()
+
+    file_ids = Jobs.keys()
+    file_ids.sort()
    
     queries = []
-    for row in rows:
+    for file_id in file_ids:
 
         # retrieve file_ids
-        rows2 = jobtracker.query("SELECT * from job_files " \
-				"WHERE job_id=%d'"%row['job_id'])
-
-        files_ids = [str(row2['file_id']) for row2 in rows2]
+        #rows = jobtracker.query("SELECT job_id from job_files " \
+				#"WHERE file_id=%d AND task LIKE 'search%'"%file_id)
+#
+#        files_ids = [str(row['file_id']) for row in rows]
 
 	# Submit all parallel jobs ()
-        for istep in range(config.searching.ddplans['nuppi']): 
-            task_name = "folding %d"%istep # TODO
+        #for istep in range(config.searching.ddplans['nuppi']): 
+	if 1:
+            #task_name = "folding %d"%istep # TODO
+            task_name = "folding"
             queries.append("INSERT INTO jobs (" \
                             "created_at, " \
                             "details, " \
                             "status, " \
                             "task, " \
                             "updated_at) " \
-                       "VALUES ('%s', '%s', '%s', '%s')" % \
+                       "VALUES ('%s', '%s', '%s', '%s', '%s')" % \
                         (jobtracker.nowstr(), 'Newly created job', \
                             'new', task_name, jobtracker.nowstr()))
 
-            for file_id in file_ids:
-                queries.append("INSERT INTO job_files (" \
+#            for file_id in files_ids:
+            queries.append("INSERT INTO job_files (" \
                                 "file_id, " \
                                 "created_at, " \
                                 "job_id, " \
                                 "updated_at) " \
-                           "%d, '%s', (SELECT LAST_INSERT_ROWID()), '%s' " %\
-                           (file_id, jobtracker.nowstr(), jobtracker.nowstr(), \
-                            "', '".join(complete)))
+				"SELECT id, '%s', (SELECT LAST_INSERT_ROWID()), '%s' " \
+				"FROM files " \
+				"WHERE id=%d" % \
+				(jobtracker.nowstr(), jobtracker.nowstr(), int(file_id)))
 
 	# Mark the previous task as 'done'
-	queries.append("UPDATE jobs " \
+        for job_id in Jobs[file_id]:
+	    queries.append("UPDATE jobs " \
 			   "SET status='done', " \
 			   "updated_at='%s', " \
 			   "details='Processed without errors' " \
 			   "WHERE id=%d" % \
-                           (jobtracker.nowstr(), row['job_id']))
+                           (jobtracker.nowstr(), job_id))
     jobtracker.query(queries)
 
 
@@ -275,11 +301,28 @@ def create_jobs():
     create_parallel_search_jobs()
 
     # Create single sifting job after all accelsearch
-    create_sifting_jobs()
+    #create_sifting_jobs()
 
     # Create parallel folding jobs after sifting 
     create_parallel_folding_jobs()
 
+
+def mark_finished_beams():
+    """
+    """
+    finished_jobs = jobtracker.query("SELECT * FROM jobs WHERE " \
+				"task like 'folding%' AND status='processed'")
+
+    queries = []
+    for finished_job in finished_jobs:
+	queries.append("UPDATE jobs " \
+		           "SET status='finished', " \
+			   "updated_at='%s', " \
+                           "details='Finished without error' " \
+                           "WHERE id=%d" % \
+			   (jobtracker.nowstr(), finished_job['id']))
+    jobtracker.query(queries)
+        
 
 def rotate():
     """For each job;
@@ -298,6 +341,7 @@ def rotate():
     update_jobs_status_from_queue()
     recover_failed_jobs()
     submit_jobs()
+    mark_finished_beams()
 
 def update_jobs_status_from_queue():
     """
@@ -471,18 +515,16 @@ def submit(job_row):
 
     # Specify requested resources for job submission
     if job_row['task']=='rfifind':
-        res = [4*60*60, 1024, 24]
-    elif search in job_row['task']:
+        res = [4*60*60, 1024, 16]
+    elif 'search' in job_row['task']:
         res = [24*60*60, 1024, 24]
     elif job_row['task']=='sifting': # Sifting should be quick
         res = [30*60, 256, 5]
-    elif folding in job_row['task']:
-        res = [4*60*60, 1024, 24]
+    elif 'folding' in job_row['task']:
+        res = [24*60*60, 1024, 24]
     #elif job_row['task']=='tidyup':
     #    res = [30*60, 256, 5]
     options = job_row['task']
-    
-    res = []
     
     try:
         SPAN512_job.presubmission_check(fns)

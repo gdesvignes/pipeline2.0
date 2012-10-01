@@ -113,7 +113,6 @@ def timed_execute(cmd, stdout=None, stderr=sys.stderr):
     # Log command to stdout
     sys.stdout.write("\n'"+cmd+"'\n")
     sys.stdout.flush()
-
     stdoutfile = False
     stderrfile = False
     if type(stdout) == types.StringType:
@@ -297,10 +296,19 @@ class obs_info:
         self.num_sifted_cands = 0
         self.num_folded_cands = 0
         self.num_single_cands = 0
-        # Set dedispersion plan
-        self.set_DDplan(task)
+	self.all_accel_cands = 0
 
-    def set_DDplan(self, task):
+        # Set dedispersion plan
+	self.task = task
+	try:
+	    self.task, self.task_id = task.split()
+	    self.task_id = int(self.task_id)
+	except:
+            self.task_id = -1
+	    self.task = self.task
+        self.set_DDplan()
+
+    def set_DDplan(self):
         """Set the dedispersion plan.
 
             The dedispersion plans are hardcoded and
@@ -309,12 +317,11 @@ class obs_info:
         # Generate dedispersion plan
         self.ddplans = []
 
-	if "DD" in task:
-	    plan_id # GD TODO
+	if self.task =='search':
 	    try:
-	        self.ddplans.append( dedisp_plan(config.searching.ddplans[self.backend][plan_id]) )
+	        self.ddplans.append( dedisp_plan(config.searching.ddplans[self.backend][self.task_id]) )
 	    except:
-	        raise ValueError("No dedispersion plan (id=%d)for backend '%s'!" % (plan_id, self.backend) )
+	        raise ValueError("No dedispersion plan (id=%d)for backend '%s'!" % (self.task_id, self.backend) )
 	    
 	else:
 	    try:
@@ -417,15 +424,16 @@ def main(filenms, workdir, resultsdir, task='all'):
     print "UTC time is:  %s"%(time.asctime(time.gmtime()))
     
     try:
-        if task == 'rfifind':
+        if job.task == 'rfifind':
 	    rfifind_job(job)
-        elif task == 'search':
+        elif job.task == 'search':
 	    search_job(job)
-        elif task == 'sifting':
+        #elif job.task == 'sifting':
+	#    sifting_job(job)
+        elif job.task == 'folding':
 	    sifting_job(job)
-        elif task == 'folding':
 	    folding_job(job)
-	elif task == 'all':
+	elif job.task == 'all':
 	    rfifind_job(job)
 	    search_job(job)
 	    sifting_job(job)
@@ -437,7 +445,14 @@ def main(filenms, workdir, resultsdir, task='all'):
         print "******************************************************"
         raise
     finally:
-        clean_up(job)
+
+        if job.task=='rfifind':
+	    rfifind_clean_up(job)
+	elif job.task=='search':
+	    search_clean_up(job)
+        elif job.task=='folding' or job.task=='all':
+	    job.masked_fraction = find_masked_fraction(job)
+            final_clean_up(job)
 
         # And finish up
         job.total_time = time.time() - job.total_time
@@ -445,8 +460,11 @@ def main(filenms, workdir, resultsdir, task='all'):
         print "UTC time is:  %s"%(time.asctime(time.gmtime()))
 
         # Write the job report
-        job.masked_fraction = find_masked_fraction(job)
-        job.write_report(os.path.join(job.outputdir, job.basefilenm+".report"))
+        #job.masked_fraction = find_masked_fraction(job)
+	report_fn = os.path.join(job.outputdir, job.basefilenm+"_"+job.task)
+	if job.task_id >= 0:
+	    report_fn+=str(job.task_id)
+        job.write_report(report_fn+".report")
 
     
 def set_up_job(filenms, workdir, resultsdir, task='all'):
@@ -489,7 +507,8 @@ def set_up_job(filenms, workdir, resultsdir, task='all'):
 
 
 def rfifind_job(job):
-    """
+    """Execute rfifind on the observation defined in the obs_info
+	instance 'job'.
     """
     
     # rfifind the data file
@@ -615,30 +634,32 @@ def search_job(job):
                 try:
                     os.remove(basenm+"_ACCEL_%d.txtcand" % config.searching.lo_accel_zmax)
                 except: pass
+
                 try:  # This prevents errors if there are no cand files to copy
-                    shutil.move(basenm+"_ACCEL_%d.cand" % config.searching.lo_accel_zmax, \
-                                    job.workdir)
-                    shutil.move(basenm+"_ACCEL_%d" % config.searching.lo_accel_zmax, \
-                                    job.workdir)
+                    shutil.move(basenm+"_ACCEL_%d.cand" % config.searching.lo_accel_zmax, job.workdir)
+		except: pass
+
+                try:  # This prevents errors if there are no cand files to copy
+                    shutil.move(basenm+"_ACCEL_%d" % config.searching.lo_accel_zmax, job.workdir)
                 except: pass
-        
+
                 # Do the high-acceleration search
-                cmd = "accelsearch -harmpolish -numharm %d -sigma %f " \
-                        "-zmax %d -flo %f %s"%\
-                        (config.searching.hi_accel_numharm, \
-                         config.searching.hi_accel_sigma, \
-                         config.searching.hi_accel_zmax, \
-                         config.searching.hi_accel_flo, fftnm)
-                job.hi_accelsearch_time += timed_execute(cmd)
-                try:
-                    os.remove(basenm+"_ACCEL_%d.txtcand" % config.searching.hi_accel_zmax)
-                except: pass
-                try:  # This prevents errors if there are no cand files to copy
-                    shutil.move(basenm+"_ACCEL_%d.cand" % config.searching.hi_accel_zmax, \
-                                    job.workdir)
-                    shutil.move(basenm+"_ACCEL_%d" % config.searching.hi_accel_zmax, \
-                                    job.workdir)
-                except: pass
+                #cmd = "accelsearch -harmpolish -numharm %d -sigma %f " \
+                #        "-zmax %d -flo %f %s"%\
+                #        (config.searching.hi_accel_numharm, \
+                #         config.searching.hi_accel_sigma, \
+                #         config.searching.hi_accel_zmax, \
+                #         config.searching.hi_accel_flo, fftnm)
+                #job.hi_accelsearch_time += timed_execute(cmd)
+                #try:
+                #    os.remove(basenm+"_ACCEL_%d.txtcand" % config.searching.hi_accel_zmax)
+                #except: pass
+                #try:  # This prevents errors if there are no cand files to copy
+                #    shutil.move(basenm+"_ACCEL_%d.cand" % config.searching.hi_accel_zmax, \
+                #                    job.workdir)
+                #    shutil.move(basenm+"_ACCEL_%d" % config.searching.hi_accel_zmax, \
+                #                    job.workdir)
+                #except: pass
 
                 # Move the .inf files
                 try:
@@ -706,6 +727,13 @@ def sifting_job(job):
                 os.rename(psname,
                         job.basefilenm+"_DMs%s_singlepulse.ps" % dmrangestr)
 
+    # Recompute the DM list
+    dmstrs = []
+    for ddplan in job.ddplans:
+        for passnum in range(ddplan.numpasses):
+            for dmstr in ddplan.dmlist[passnum]:
+                dmstrs.append(dmstr)
+
     # Sift through the candidates to choose the best to fold
     job.sifting_time = time.time()
 
@@ -716,34 +744,34 @@ def sifting_job(job):
         lo_accel_cands = sifting.remove_DM_problems(lo_accel_cands, config.searching.numhits_to_fold,
                                                     dmstrs, config.searching.low_DM_cutoff)
 
-    hi_accel_cands = sifting.read_candidates(glob.glob("*ACCEL_%d" % config.searching.hi_accel_zmax))
-    if len(hi_accel_cands):
-        hi_accel_cands = sifting.remove_duplicate_candidates(hi_accel_cands)
-    if len(hi_accel_cands):
-        hi_accel_cands = sifting.remove_DM_problems(hi_accel_cands, config.searching.numhits_to_fold,
-                                                    dmstrs, config.searching.low_DM_cutoff)
+    #hi_accel_cands = sifting.read_candidates(glob.glob("*ACCEL_%d" % config.searching.hi_accel_zmax))
+    #if len(hi_accel_cands):
+    #    hi_accel_cands = sifting.remove_duplicate_candidates(hi_accel_cands)
+    #if len(hi_accel_cands):
+    #    hi_accel_cands = sifting.remove_DM_problems(hi_accel_cands, config.searching.numhits_to_fold,
+    #                                                dmstrs, config.searching.low_DM_cutoff)
 
-    all_accel_cands = lo_accel_cands + hi_accel_cands
-    if len(all_accel_cands):
-        all_accel_cands = sifting.remove_harmonics(all_accel_cands)
+    job.all_accel_cands = lo_accel_cands #+ hi_accel_cands
+    if len(job.all_accel_cands):
+        job.all_accel_cands = sifting.remove_harmonics(job.all_accel_cands)
         # Note:  the candidates will be sorted in _sigma_ order, not _SNR_!
-        all_accel_cands.sort(sifting.cmp_sigma)
+        job.all_accel_cands.sort(sifting.cmp_sigma)
         print "Sending candlist to stdout before writing to file"
-        sifting.write_candlist(all_accel_cands)
+        sifting.write_candlist(job.all_accel_cands)
         sys.stdout.flush()
-        sifting.write_candlist(all_accel_cands, job.basefilenm+".accelcands")
+        sifting.write_candlist(job.all_accel_cands, job.basefilenm+".accelcands")
         # Make sifting summary plots
-        all_accel_cands.plot_goodbad()
+        job.all_accel_cands.plot_goodbad()
         plt.title("%s Rejected Cands" % job.basefilenm)
         plt.savefig(job.basefilenm+".accelcands.rejects.png")
-        all_accel_cands.plot_summary()
+        job.all_accel_cands.plot_summary()
         plt.title("%s Periodicity Summary" % job.basefilenm)
         plt.savefig(job.basefilenm+".accelcands.summary.png")
         
         # Write out sifting candidate summary
-        all_accel_cands.print_cand_summary(job.basefilenm+".accelcands.summary")
+        job.all_accel_cands.print_cand_summary(job.basefilenm+".accelcands.summary")
         # Write out sifting comprehensive report of bad candidates
-        all_accel_cands.write_cand_report(job.basefilenm+".accelcands.report")
+        job.all_accel_cands.write_cand_report(job.basefilenm+".accelcands.report")
         timed_execute("gzip --best %s" % job.basefilenm+".accelcands.report")
 
         # Moving of results to resultsdir now happens in clean_up(...)
@@ -770,7 +798,7 @@ def folding_job(job):
 
     # Fold the best candidates
     cands_folded = 0
-    for cand in all_accel_cands:
+    for cand in job.all_accel_cands:
         print "At cand %s" % str(cand)
         if cands_folded == config.searching.max_cands_to_fold:
             break
@@ -781,7 +809,7 @@ def folding_job(job):
     job.num_cands_folded = cands_folded
     
     # Rate candidates
-    timed_execute("rate_pfds.py --redirect-warnings --include-all -x pulse_width *.pfd")
+    timed_execute("rate_pfds.py --redirect-warnings --include-all -x pulse_width *.pfd ")
     sys.stdout.flush()
 
     # Calculate some candidate attributes from pfds
@@ -839,7 +867,71 @@ def folding_job(job):
     #####
 
 
-def clean_up(job):
+def tar_and_copy(job, tar_suffixes, tar_globs):
+    print "Tarring up results"
+    for (tar_suffix, tar_glob) in zip(tar_suffixes, tar_globs):
+        print "Opening tarball %s" % (job.basefilenm+tar_suffix)
+        print "Using glob %s" % tar_glob
+        tf = tarfile.open(job.basefilenm+tar_suffix, "w:gz")
+        for infile in glob.glob(tar_glob):
+            print "    Adding file %s" % infile
+            tf.add(infile)
+            os.remove(infile)
+        tf.close()
+    sys.stdout.flush()
+
+    # Copy all the important stuff to the output directory
+    #resultglobs = ["*rfifind.[bimors]*", "*.ps.gz", "*.tgz", "*.png", \
+    resultglobs = ["*.ps.gz", "*.tgz", "*.png", \
+                    "*.zaplist", "search_params.txt", "*.accelcands*", \
+                    "*_merge.out", "candidate_attributes.txt"]
+    for resultglob in resultglobs:
+            for file in glob.glob(resultglob):
+                shutil.move(file, job.outputdir)
+
+
+def rfifind_clean_up(job):
+    # Tar up the results files 
+    tar_suffixes = ["_rfifind.tgz"]
+    tar_globs = ["*_rfifind.[bimorsp]*"]
+    tar_and_copy(job, tar_suffixes, tar_globs)
+
+
+def search_clean_up(job):
+    # Tar up the results files 
+    if job.task_id >= 0:
+        tar_suffixes = ["_ACCEL_task%d.tgz"%job.task_id,
+		"_ACCEL_task%d.cand.tgz"%job.task_id,
+		"_singlepulse_task%d.tgz"%job.task_id,
+		"_inf_task%d.tgz"%job.task_id]
+        tar_globs = ["*DM*_ACCEL*[!d]",
+		"*_ACCEL*.cand",
+		"*.singlepulse",
+		"*_DM[0-9]*.inf"]
+    else:
+        tar_suffixes = ["_ACCEL.tgz",
+		"_ACCEL.cand.tgz",
+		"_singlepulse.tgz",
+		"_inf.tgz"]
+        tar_globs = ["*DM*_ACCEL*[!d]",
+		"*_ACCEL*.cand",
+		"*.singlepulse",
+		"*_DM[0-9]*.inf"]
+    tar_and_copy(job, tar_suffixes, tar_globs)
+
+
+def folding_clean_up(job):
+    # Tar up the results files 
+    tar_suffixes = ["_pfd.tgz",
+		"_bestprof.tgz",
+		"_pfd_rat.tgz"]
+    tar_globs = ["*.pfd",
+		"*.pfd.bestprof",
+		"*.pfd.rat"]
+    tar_and_copy(job, tar_suffixes, tar_globs)
+
+
+def final_clean_up(job):
     """Clean up.
         Tar results, copy them to the results directory.
     """
@@ -884,7 +976,7 @@ def clean_up(job):
     # Copy all the important stuff to the output directory
     resultglobs = ["*rfifind.[bimors]*", "*.ps.gz", "*.tgz", "*.png", \
                     "*.zaplist", "search_params.txt", "*.accelcands*", \
-                    "*_merge.out", "candidate_attributes.txt"]
+                    "*_merge.out", "candidate_attributes.txt", "*.report"]
     
     # Print some info useful for debugging
     print "Contents of workdir (%s) before copy: " % job.workdir
