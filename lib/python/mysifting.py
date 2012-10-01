@@ -225,19 +225,22 @@ class Candlist(object):
                     'Harmonic cand', 'DM problem', 'Good cands', 'Hits']
         colours = ['#FF0000', '#800000', '#008000', '#00FF00', \
                     '#00FFFF', '#0000FF', '#FF00FF', '#800080', 'r', 'k']
-        markers = ['o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'x', ',']
+        markers = ['o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'x', 'o']
         zorders = [-2, -2, -2, -2, -2, -2, -2, -2, 0, 0]
-        sizes = [50, 50, 50, 50, 50, 50, 50, 50, 100, 10]
+        sizes = [50, 50, 50, 50, 50, 50, 50, 50, 100, 1]
         fixedsizes = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1]
         lws = [1,1,1,1,1,1,1,1,2,1]
         handles = []
-        for cands, colour, marker, zorder, size, fixedsize, lw in \
-                zip(candlists, colours, markers, zorders, sizes, fixedsizes, lws):
+        labs = []
+        for cands, colour, marker, zorder, size, fixedsize, lw, lab in \
+                zip(candlists, colours, markers, zorders, sizes, fixedsizes, lws, labels):
             sigmas = Num.array([c.sigma for c in cands])
             isort = sigmas.argsort()
             sigmas = sigmas[isort]
             freqs = Num.array([c.f for c in cands])[isort]
             dms = Num.array([c.DM for c in cands])[isort]
+
+	    if not cands: continue
             
             # Plot the candidates
             if fixedsize:
@@ -246,10 +249,11 @@ class Candlist(object):
             else:
                 plt.scatter(freqs, dms, s=8+sigmas**1.7, lw=lw, \
                             c=colour, marker=marker, alpha=0.7, zorder=zorder)
-            handles.append(plt.scatter([], [], s=size, c=colour, \
+            handles.append(plt.scatter([-1], [0], s=size, c=colour, \
                                     marker=marker, alpha=0.7))
+	    labs.append(lab)
 
-        fig.legend(handles, labels, 'lower center', \
+        fig.legend(handles, labs, 'lower center', \
                         prop={'size':'x-small'}, ncol=4)
 
         plt.xscale('log', base=10.0) 
