@@ -195,6 +195,15 @@ def search(fns, workdir, resultsdir, task):
     import SPAN512_presto_search
     SPAN512_presto_search.main(fns, workdir, resultsdir, task)
 
+    # Remove data, weights, scales and offsets from fits files
+    # and stash them in the results directory.
+    print "Removing data, weights, scales and offsets."
+    for fn in fns:
+        system_call("fitsdelcol %s[SUBINT] DATA DAT_WTS DAT_SCL DAT_OFFS" % fn)
+	system_call("rsync -auvl %s %s" % (fn, resultsdir))
+
+
+
 def main():
     workdir = None
     resultsdir = None
