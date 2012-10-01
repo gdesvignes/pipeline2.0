@@ -34,16 +34,16 @@ def run():
 
     """
     query = "SELECT * FROM jobs " \
-            "WHERE status='processed'"
-    processed_jobs = jobtracker.query(query)
-    print "Found %d processed jobs waiting for upload" % len(processed_jobs)
-    for ii, job in enumerate(processed_jobs):
+            "WHERE status='finished'"
+    finished_jobs = jobtracker.query(query)
+    print "Found %d finished jobs waiting for upload" % len(finished_jobs)
+    for ii, job in enumerate(finished_jobs):
         # Get the job's most recent submit
         submit = jobtracker.query("SELECT * FROM job_submits " \
                                   "WHERE job_id=%d " \
-                                    "AND status='processed' " \
+                                    "AND status='finished' " \
                                   "ORDER BY id DESC" % job['id'], fetchone=True)
-        print "Upload %d of %d" % (ii+1, len(processed_jobs))
+        print "Upload %d of %d" % (ii+1, len(finished_jobs))
         upload_results(submit)
 
 
