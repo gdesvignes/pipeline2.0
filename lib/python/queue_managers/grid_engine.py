@@ -102,7 +102,6 @@ class GEManager(queue_managers.generic_interface.PipelineQueueManager):
         cmd = "qsub  -V -v DATAFILES='%s',OUTDIR='%s'%s -l ct=%d,vmem=%dM,fsize=%dG%s%s -N %s -e %s -o %s %s" %\
                    (';'.join(datafiles), outdir, opts, cputime, memory, fsize, hpss_opt, sps_opt, self.job_basename,\
                       errorlog, stdoutlog, script)
-		     
         queue_id, error, comm_err = self._exec_check_for_failure(cmd)
 	try:
             queue_id = queue_id.split()[2]
@@ -300,7 +299,6 @@ class GEManager(queue_managers.generic_interface.PipelineQueueManager):
         """
 
         stderr_path = os.path.join(config.basic.qsublog_dir, "%s.e%s" % (self.job_basename, queue_id))
-	print stderr_path
 	                              
         if not os.path.exists(stderr_path):
             raise ValueError("Cannot find error log for job (%s): %s" % \
@@ -353,7 +351,7 @@ class GEManager(queue_managers.generic_interface.PipelineQueueManager):
     def _showq(self, update_time=10):
 
         if time.time() >= self.showq_last_update + update_time:
-            print "Updating qstat cache ..."
+            #print "Updating qstat cache ..."
 
             cmd = 'qstat -xml'
             output, error, comm_err = self._exec_check_for_failure(cmd)
