@@ -326,6 +326,10 @@ class GEManager(queue_managers.generic_interface.PipelineQueueManager):
                 errors = True
             else:
                 errors = False
+
+        if self._check_job_return_status(queue_id):
+	    errors = True
+
         return errors
 
     def get_errors(self, queue_id):
@@ -346,7 +350,31 @@ class GEManager(queue_managers.generic_interface.PipelineQueueManager):
                 err_f = open(errorlog, 'r')
                 errors = err_f.read()
                 err_f.close()
+         
+	errors += "\nReturned exit_status %d"%self._check_job_return_status(queue_id) 
+
         return errors
+
+    def _check_job_return_status(self, queue_id):
+        """Private method to check the status of the job after completion.
+        
+            Input:
+                queue_id: Queue's unique identifier for the job.
+
+            Output:
+                ret_code: The exit status reported by the queue manager (if no error, returns zero). 
+        """
+        cmd = 'qacct -j %d -g glast'%queue_id
+        output, error, comm_err = self._exec_check_for_failure(cmd)
+
+	ret_code = 0
+        if comm_err:
+          return None, comm_err
+        else:
+	    for line in output.splitlines():
+	        if 'exit_status' in line:
+		    ret_code = int(line.split()[1])
+	return ret_code
 
     def _showq(self, update_time=10):
 
