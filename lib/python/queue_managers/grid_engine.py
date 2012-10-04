@@ -364,7 +364,7 @@ class GEManager(queue_managers.generic_interface.PipelineQueueManager):
             Output:
                 ret_code: The exit status reported by the queue manager (if no error, returns zero). 
         """
-        cmd = 'qacct -j %d -g glast'%queue_id
+        cmd = 'qacct -j %s -g glast'%queue_id
         output, error, comm_err = self._exec_check_for_failure(cmd)
 
 	ret_code = 0
