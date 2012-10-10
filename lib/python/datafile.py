@@ -439,7 +439,7 @@ class WappPsrfitsData(PsrfitsData):
 class NuppiPsrfitsData(PsrfitsData):
     """PSR fits Data object for NUPPI data.
     """
-    filename_re = re.compile(r'nuppi_(?P<mjd>\d{5})_(?P<source>SRV\d{6})\_' \
+    filename_re = re.compile(r'nuppi_(?P<mjd>\d{5})_(?P<source>.*)_' \
                                 r'(?P<scan>\d{6})_(?P<fileno>\d{4}).fits')
 
 class MockPsrfitsData(PsrfitsData):
