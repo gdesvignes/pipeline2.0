@@ -40,6 +40,7 @@ known_birds_f = []
 fund_re = re.compile("^\d")
 harms_re = re.compile("^[ ]\d")
 DM_re = re.compile("DM(\d+\.\d{2})")
+xpart_re = re.compile(r'-part(?P<ipart>\d{1})x(?P<npart>\d{1})*')
 
 # Add some functions to maintain support for the old
 # sifting API
@@ -113,7 +114,7 @@ def cmp_freq(self, other):
 
 class Candidate(object):
     def __init__(self, candnum, sigma, numharm, ipow, cpow, bin, z,
-                 DMstr, filename, T):
+                 DMstr, filename, T, ipart, npart):
         self.path, self.filename = os.path.split(filename)
         self.candnum = candnum
         self.sigma = sigma
@@ -132,6 +133,8 @@ class Candidate(object):
         self.snr = 0.0
         self.hits = []
         self.note = ""
+	self.ipart = ipart
+	self.npart = npart
 
     def add_as_hit(self, other):
         self.hits.extend(other.hits)
@@ -139,10 +142,11 @@ class Candidate(object):
     def __str__(self):
         cand = self.filename + ':' + `self.candnum`
         return "%-65s   %7.2f  %6.2f  %6.2f  %s   %7.1f  %7.1f  " \
-                "%12.6f  %10.2f  %8.2f " % \
+                "%12.6f  %10.2f  %8.2f %4s %4s" % \
                         (cand, self.DM, self.snr, self.sigma, \
-                        "%2d".center(7)%self.numharm,
-                        self.ipow_det, self.cpow, self.p*1000, self.r, self.z)
+                        "%2d".center(7)%self.numharm, \
+                        self.ipow_det, self.cpow, self.p*1000, self.r, self.z, \
+			str(self.ipart), str(self.npart))
 
     def harms_to_snr(self):
         # Remove the average power level
@@ -816,7 +820,8 @@ class Candlist(object):
         candfile.write("#" + "file:candnum".center(66) + "DM".center(9) +
                        "SNR".center(8) + "sigma".center(8) + "numharm".center(9) +
                        "ipow".center(9) + "cpow".center(9) +  "P(ms)".center(14) +
-                       "r".center(12) + "z".center(8) + "numhits".center(9) + "\n")
+                       "r".center(12) + "z".center(8) + "numhits".center(9) + 
+		       "ipart".center(7) + "npart".center(7) + "\n")
         for goodcand in self.cands:
             candfile.write("%s (%d)\n" % (str(goodcand), len(goodcand.hits)))
             if (len(goodcand.hits) > 1):
@@ -837,6 +842,16 @@ def candlist_from_candfile(filename):
             dt = float(line.split()[-1])
     tobs = numsamp * dt
 
+    # Identify is the candidate was found in a fraction of the original data
+    # Look for special keyword in the filename
+    m = xpart_re.search(filename)
+    if m:
+        ipart = int(m.groups()[0])
+        npart = int(m.groups()[1])
+    else:
+        ipart = None
+	npart = None
+        
     cands = []
     candnums = []
     current_goodcandnum = 0
@@ -858,7 +873,7 @@ def candlist_from_candfile(filename):
             DMstr = DM_re.search(filename).groups()[0]
             cands.append(Candidate(candnum, sigma, numharm,
                                           i_pow_det, c_pow, bin, z, 
-                                          DMstr, filename, tobs))
+                                          DMstr, filename, tobs, ipart, npart))
             candnums.append(candnum)
             continue
 

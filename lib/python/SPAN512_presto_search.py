@@ -222,6 +222,10 @@ def get_folding_command(cand, obs):
     if npart > obs.numrows:
         npart = obs.numrows
 
+    # If the candidate was found in a fraction of the data, just fold this fraction
+    if cand.npart:
+        otheropts += " -start %.2f -end %.2f"%(cand.ipart/float(cand.npart), (cand.ipart+1)/float(cand.npart)) 
+
     # Get number of subbands to use
     if obs.backend.lower() == 'pdev':
         nsub = 96
@@ -611,6 +615,45 @@ def search_job(job):
 			shutil.move(basenm_zerodm+".singlepulse", job.workdir)
 		    except: pass
 
+
+		# Search the splitted obs - High acceleration
+		if config.searching.split:
+		    sdatnms = split_dat.split_dat(datnm, config.searching.split)
+
+		    for sdatnm in sdatnms:
+			sbasenm = sdatnm.rstrip('.dat')
+			sfftnm = sbasenm+".fft"
+
+			# FFT, zap, and de-redden
+			cmd = "realfft %s"%sdatnm
+			job.FFT_time += timed_execute(cmd)
+			cmd = "zapbirds -zap -zapfile %s -baryv %.6g %s"%\
+			      (zaplist, job.baryv, sfftnm)
+			job.FFT_time += timed_execute(cmd)
+			cmd = "rednoise %s"%sfftnm
+			job.FFT_time += timed_execute(cmd)
+			try:
+			    os.rename(sbasenm+"_red.fft", sfftnm)
+			except: pass
+
+			# Do the low-acceleration search
+			cmd = "accelsearch -harmpolish -numharm %d -sigma %f " \
+				"-zmax %d -flo %f %s"%\
+				(config.searching.hi_accel_numharm, \
+				 config.searching.hi_accel_sigma, \
+				 config.searching.hi_accel_zmax, \
+				 config.searching.hi_accel_flo, sfftnm)
+			job.hi_accelsearch_time += timed_execute(cmd)
+			try:
+			    os.remove(sbasenm+"_ACCEL_%d.txtcand" % config.searching.hi_accel_zmax)
+			except: pass
+
+			try:  # This prevents errors if there are no cand files to copy
+			    shutil.move(sbasenm+"_ACCEL_%d.cand" % config.searching.hi_accel_zmax, job.workdir)
+			    shutil.move(sbasenm+"_ACCEL_%d" % config.searching.hi_accel_zmax, job.workdir)
+			except: pass
+
+
                 # FFT, zap, and de-redden
                 cmd = "realfft %s"%datnm
                 job.FFT_time += timed_execute(cmd)
@@ -622,7 +665,7 @@ def search_job(job):
                 try:
                     os.rename(basenm+"_red.fft", fftnm)
                 except: pass
-                
+
                 # Do the low-acceleration search
                 cmd = "accelsearch -harmpolish -numharm %d -sigma %f " \
                         "-zmax %d -flo %f %s"%\
@@ -634,32 +677,10 @@ def search_job(job):
                 try:
                     os.remove(basenm+"_ACCEL_%d.txtcand" % config.searching.lo_accel_zmax)
                 except: pass
-
                 try:  # This prevents errors if there are no cand files to copy
                     shutil.move(basenm+"_ACCEL_%d.cand" % config.searching.lo_accel_zmax, job.workdir)
-		except: pass
-
-                try:  # This prevents errors if there are no cand files to copy
                     shutil.move(basenm+"_ACCEL_%d" % config.searching.lo_accel_zmax, job.workdir)
                 except: pass
-
-                # Do the high-acceleration search
-                #cmd = "accelsearch -harmpolish -numharm %d -sigma %f " \
-                #        "-zmax %d -flo %f %s"%\
-                #        (config.searching.hi_accel_numharm, \
-                #         config.searching.hi_accel_sigma, \
-                #         config.searching.hi_accel_zmax, \
-                #         config.searching.hi_accel_flo, fftnm)
-                #job.hi_accelsearch_time += timed_execute(cmd)
-                #try:
-                #    os.remove(basenm+"_ACCEL_%d.txtcand" % config.searching.hi_accel_zmax)
-                #except: pass
-                #try:  # This prevents errors if there are no cand files to copy
-                #    shutil.move(basenm+"_ACCEL_%d.cand" % config.searching.hi_accel_zmax, \
-                #                    job.workdir)
-                #    shutil.move(basenm+"_ACCEL_%d" % config.searching.hi_accel_zmax, \
-                #                    job.workdir)
-                #except: pass
 
                 # Move the .inf files
                 try:
@@ -737,6 +758,19 @@ def sifting_job(job):
     # Sift through the candidates to choose the best to fold
     job.sifting_time = time.time()
 
+
+    # TODO
+    for ipart in config.searching.split:
+        
+	tmp_accel_cands = sifting.read_candidates(glob.glob("*ACCEL_%d" % config.searching.hi_accel_zmax))
+	if len(tmp_accel_cands):
+	    tmp_accel_cands = sifting.remove_duplicate_candidates(tmp_accel_cands)
+	if len(tmp_accel_cands):
+	    tmp_accel_cands = sifting.remove_DM_problems(tmp_accel_cands, config.searching.numhits_to_fold,
+							dmstrs, config.searching.low_DM_cutoff)
+	if ipart: hi_accel_cands += tmp_cands						
+	else: hi_accel_cands = tmp_cands						
+
     lo_accel_cands = sifting.read_candidates(glob.glob("*ACCEL_%d" % config.searching.lo_accel_zmax))
     if len(lo_accel_cands):
         lo_accel_cands = sifting.remove_duplicate_candidates(lo_accel_cands)
@@ -744,15 +778,11 @@ def sifting_job(job):
         lo_accel_cands = sifting.remove_DM_problems(lo_accel_cands, config.searching.numhits_to_fold,
                                                     dmstrs, config.searching.low_DM_cutoff)
 
-    #hi_accel_cands = sifting.read_candidates(glob.glob("*ACCEL_%d" % config.searching.hi_accel_zmax))
-    #if len(hi_accel_cands):
-    #    hi_accel_cands = sifting.remove_duplicate_candidates(hi_accel_cands)
-    #if len(hi_accel_cands):
-    #    hi_accel_cands = sifting.remove_DM_problems(hi_accel_cands, config.searching.numhits_to_fold,
-    #                                                dmstrs, config.searching.low_DM_cutoff)
-
-    job.all_accel_cands = lo_accel_cands #+ hi_accel_cands
+    job.all_accel_cands = lo_accel_cands + hi_accel_cands
     if len(job.all_accel_cands):
+
+        job.all_accel_cands = sifting.remove_duplicate_candidates(job.all_accel_cands)
+
         job.all_accel_cands = sifting.remove_harmonics(job.all_accel_cands)
         # Note:  the candidates will be sorted in _sigma_ order, not _SNR_!
         job.all_accel_cands.sort(sifting.cmp_sigma)
