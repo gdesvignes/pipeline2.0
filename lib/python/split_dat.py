@@ -1,18 +1,21 @@
 import sys, copy
 import subprocess
-from myinfodata import *
+from infodata import *
 
 NPART = 2
 
 
 def copy_small_dat(filename, outfilename, npts, ipart):
+
+    # subprocess.DEVNULL is only suppoted in python >3.3
+    out_fd = open('dd-log','w')
     
     cmd = "dd if=%s of=%s bs=%d count=1"%(filename, outfilename, npts*4)
     if ipart:
         cmd += " skip=%d"%ipart
     
     #print cmd
-    retcode = subprocess.call(cmd, shell=True)
+    retcode = subprocess.call(cmd, shell=True, stdout=out_fd, stderr=out_fd)
     #retcode = subprocess.call(cmd)
 
 

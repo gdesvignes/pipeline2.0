@@ -26,6 +26,7 @@ import matplotlib.pyplot as plt
 import mysifting as sifting # Temporarily until 'sifting.py' 
                             # in PRESTO is updated
 
+import split_dat
 import datafile
 import config.searching
 import config.processing
@@ -760,7 +761,7 @@ def sifting_job(job):
 
 
     # TODO
-    for ipart in config.searching.split:
+    for ipart in range(config.searching.split):
         
 	tmp_accel_cands = sifting.read_candidates(glob.glob("*ACCEL_%d" % config.searching.hi_accel_zmax))
 	if len(tmp_accel_cands):
