@@ -769,8 +769,8 @@ def sifting_job(job):
 	if len(tmp_accel_cands):
 	    tmp_accel_cands = sifting.remove_DM_problems(tmp_accel_cands, config.searching.numhits_to_fold,
 							dmstrs, config.searching.low_DM_cutoff)
-	if ipart: hi_accel_cands += tmp_cands						
-	else: hi_accel_cands = tmp_cands						
+	if ipart: hi_accel_cands += tmp_accel_cands						
+	else: hi_accel_cands = tmp_accel_cands						
 
     lo_accel_cands = sifting.read_candidates(glob.glob("*ACCEL_%d" % config.searching.lo_accel_zmax))
     if len(lo_accel_cands):
