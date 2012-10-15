@@ -624,6 +624,7 @@ def search_job(job):
 		    for sdatnm in sdatnms:
 			sbasenm = sdatnm.rstrip('.dat')
 			sfftnm = sbasenm+".fft"
+			sinfnm = sbasenm+".inf"
 
 			# FFT, zap, and de-redden
 			cmd = "realfft %s"%sdatnm
@@ -652,6 +653,18 @@ def search_job(job):
 			try:  # This prevents errors if there are no cand files to copy
 			    shutil.move(sbasenm+"_ACCEL_%d.cand" % config.searching.hi_accel_zmax, job.workdir)
 			    shutil.move(sbasenm+"_ACCEL_%d" % config.searching.hi_accel_zmax, job.workdir)
+			except: pass
+
+			# Move the .inf files
+			try:
+			    shutil.move(sinfnm, job.workdir)
+			except: pass
+			# Remove the .dat and .fft files
+			try:
+			    os.remove(sdatnm)
+			except: pass
+			try:
+			    os.remove(sfftnm)
 			except: pass
 
 
