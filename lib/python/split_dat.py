@@ -53,7 +53,7 @@ def split_dat(dat_fn, npart):
 
 	# Manage breaks in the data
 	if info.breaks:
-	    print (i+1)*new_info.N-1, info.onoff[0][1]
+	    #print (i+1)*new_info.N-1, info.onoff[0][1]
 	    if (i+1)*new_info.N-1 <= info.onoff[0][1]:
 		new_info.breaks = 0
 	    else:
