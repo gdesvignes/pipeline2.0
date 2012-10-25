@@ -506,6 +506,15 @@ def rfifind_job(job):
     cmd = "rfifind %s -time %.17g -o %s %s" % \
           (config.searching.datatype_flag, config.searching.rfifind_chunk_time, job.basefilenm,
            job.filenmstr)
+    if config.searching.bad_chans:
+        cmd += " -zapchan %s"%config.searching.bad_chans	   
+    if config.searching.bad_ints:
+        cmd += " -zapints %s"%config.searching.bad_ints	   
+    if config.searching.timesig:
+        cmd += " -timesig %.2f"%config.searching.timesig   
+    if config.searching.freqsig:
+        cmd += " -freqsig %.2f"%config.searching.freqsig   
+
     job.rfifind_time += timed_execute(cmd, stdout="%s_rfifind.out" % job.basefilenm)
     # Find the fraction that was suggested to be masked
     # Note:  Should we stop processing if the fraction is

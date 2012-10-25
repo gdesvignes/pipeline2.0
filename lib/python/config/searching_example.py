@@ -31,6 +31,10 @@ hi_accel_zmax           = 50   # bins
 hi_accel_flo            = 1.0  # Hz
 low_T_to_search         = 20.0 # sec
 split                   = 0    # Don't split the data if =0
+bad_chans               = "0,645,646,647,648,649,650,651,652,653,654,781,782,783,784,785,786,787,788,789,790,791,792"
+bad_ints                = "15,16,17,18"
+timesig                 = 9
+freqsig                 = 3.5
 
 # DDplan configurations
 # The following configurations are for calculating dedispersion plans 
