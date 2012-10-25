@@ -494,20 +494,6 @@ def set_up_job(filenms, workdir, resultsdir, task='all'):
     job.tempdir = tempfile.mkdtemp(suffix="_tmp", prefix=job.basefilenm, \
                         dir=config.processing.base_tmp_dir)
     
-    #####
-    # Print some info useful for debugging
-    print "Initial contents of workdir (%s): " % workdir
-    for fn in os.listdir(workdir):
-        print "    %s" % fn
-    print "Initial contents of resultsdir (%s): " % resultsdir
-    for fn in os.listdir(resultsdir):
-        print "    %s" % fn
-    print "Initial contents of job.tempdir (%s): " % job.tempdir
-    for fn in os.listdir(job.tempdir):
-        print "    %s" % fn
-    sys.stdout.flush()
-    #####
-
     return job
 
 
@@ -586,7 +572,7 @@ def search_job(job):
                         ddplan.dmsperpass, ddplan.dd_downsamp*ddplan.sub_downsamp, 
                         psr_utils.choose_N(job.orig_N/ddplan.downsamp), ddplan.numsub, 
                         job.tempdir, job.basefilenm, job.filenmstr)
-                job.dedispersing_time += timed_execute(cmd)
+                job.dedispersing_time += timed_execute(cmd, stdout=os.devnull)
             
             # Iterate over all the new DMs
             for dmstr in ddplan.dmlist[passnum]:
@@ -602,7 +588,7 @@ def search_job(job):
                 cmd = "single_pulse_search.py -p -m %f -t %f %s"%\
                       (config.searching.singlepulse_maxwidth, \
                        config.searching.singlepulse_threshold, datnm)
-                job.singlepulse_time += timed_execute(cmd)
+                job.singlepulse_time += timed_execute(cmd, stdout=os.devnull)
                 try:
                     shutil.move(basenm+".singlepulse", job.workdir)
                 except: pass
@@ -611,7 +597,7 @@ def search_job(job):
 		    cmd = "single_pulse_search.py -p -m %f -t %f %s"%\
 			  (config.searching.singlepulse_maxwidth, \
 			   config.searching.singlepulse_threshold, datnm_zerodm)
-		    job.singlepulse_time += timed_execute(cmd)
+		    job.singlepulse_time += timed_execute(cmd, stdout=os.devnull)
 		    try:
 			shutil.move(basenm_zerodm+".singlepulse", job.workdir)
 		    except: pass
@@ -628,12 +614,12 @@ def search_job(job):
 
 			# FFT, zap, and de-redden
 			cmd = "realfft %s"%sdatnm
-			job.FFT_time += timed_execute(cmd)
+			job.FFT_time += timed_execute(cmd, stdout=os.devnull)
 			cmd = "zapbirds -zap -zapfile %s -baryv %.6g %s"%\
 			      (zaplist, job.baryv, sfftnm)
-			job.FFT_time += timed_execute(cmd)
+			job.FFT_time += timed_execute(cmd, stdout=os.devnull)
 			cmd = "rednoise %s"%sfftnm
-			job.FFT_time += timed_execute(cmd)
+			job.FFT_time += timed_execute(cmd, stdout=os.devnull)
 			try:
 			    os.rename(sbasenm+"_red.fft", sfftnm)
 			except: pass
@@ -645,7 +631,7 @@ def search_job(job):
 				 config.searching.hi_accel_sigma, \
 				 config.searching.hi_accel_zmax, \
 				 config.searching.hi_accel_flo, sfftnm)
-			job.hi_accelsearch_time += timed_execute(cmd)
+			job.hi_accelsearch_time += timed_execute(cmd, stdout=os.devnull)
 			try:
 			    os.remove(sbasenm+"_ACCEL_%d.txtcand" % config.searching.hi_accel_zmax)
 			except: pass
@@ -670,12 +656,12 @@ def search_job(job):
 
                 # FFT, zap, and de-redden
                 cmd = "realfft %s"%datnm
-                job.FFT_time += timed_execute(cmd)
+                job.FFT_time += timed_execute(cmd, stdout=os.devnull)
                 cmd = "zapbirds -zap -zapfile %s -baryv %.6g %s"%\
                       (zaplist, job.baryv, fftnm)
-                job.FFT_time += timed_execute(cmd)
+                job.FFT_time += timed_execute(cmd, stdout=os.devnull)
                 cmd = "rednoise %s"%fftnm
-                job.FFT_time += timed_execute(cmd)
+                job.FFT_time += timed_execute(cmd, stdout=os.devnull)
                 try:
                     os.rename(basenm+"_red.fft", fftnm)
                 except: pass
@@ -687,7 +673,7 @@ def search_job(job):
                          config.searching.lo_accel_sigma, \
                          config.searching.lo_accel_zmax, \
                          config.searching.lo_accel_flo, fftnm)
-                job.lo_accelsearch_time += timed_execute(cmd)
+                job.lo_accelsearch_time += timed_execute(cmd, stdout=os.devnull)
                 try:
                     os.remove(basenm+"_ACCEL_%d.txtcand" % config.searching.lo_accel_zmax)
                 except: pass
@@ -776,7 +762,7 @@ def sifting_job(job):
     # TODO
     for ipart in range(config.searching.split):
         
-	tmp_accel_cands = sifting.read_candidates(glob.glob("*ACCEL_%d" % config.searching.hi_accel_zmax))
+	tmp_accel_cands = sifting.read_candidates(glob.glob("*part%d_DM*ACCEL_%d" % (ipart, config.searching.hi_accel_zmax)))
 	if len(tmp_accel_cands):
 	    tmp_accel_cands = sifting.remove_duplicate_candidates(tmp_accel_cands)
 	if len(tmp_accel_cands):
@@ -823,20 +809,6 @@ def sifting_job(job):
 
     job.sifting_time = time.time() - job.sifting_time
 
-    #####
-    # Print some info useful for debugging
-    print "Contents of workdir (%s) before folding: " % job.workdir
-    for fn in os.listdir(job.workdir):
-        print "    %s" % fn
-    print "Contents of resultsdir (%s) before folding: " % job.outputdir
-    for fn in os.listdir(job.outputdir):
-        print "    %s" % fn
-    print "Contents of job.tempdir (%s) before folding: " % job.tempdir
-    for fn in os.listdir(job.tempdir):
-        print "    %s" % fn
-    sys.stdout.flush()
-    #####
-
 
 def folding_job(job):
 
@@ -875,21 +847,8 @@ def folding_job(job):
             attrib_file.write("%s\t%s\t%.3f\n" % (pfdfn, key, attribs[key]))
     attrib_file.close()
 
-    # Print some info useful for debugging
-    print "Contents of workdir (%s) after folding: " % job.workdir
-    for fn in os.listdir(job.workdir):
-        print "    %s" % fn
-    print "Contents of resultsdir (%s) after folding: " % job.outputdir
-    for fn in os.listdir(job.outputdir):
-        print "    %s" % fn
-    print "Contents of job.tempdir (%s) after folding: " % job.tempdir
-    for fn in os.listdir(job.tempdir):
-        print "    %s" % fn
-    sys.stdout.flush()
-    #####
     
     # Now step through the .ps files and convert them to .png and gzip them
-
     psfiles = glob.glob("*.ps")
     for psfile in psfiles:
         # The '[0]' appeneded to the end of psfile is to convert only the 1st page
@@ -897,19 +856,6 @@ def folding_job(job):
                             (psfile+"[0]", psfile[:-3]+".png"))
         timed_execute("gzip "+psfile)
     
-    # Print some info useful for debugging
-    print "Contents of workdir (%s) after conversion: " % job.workdir
-    for fn in os.listdir(job.workdir):
-        print "    %s" % fn
-    print "Contents of resultsdir (%s) after conversion: " % job.outputdir
-    for fn in os.listdir(job.outputdir):
-        print "    %s" % fn
-    print "Contents of job.tempdir (%s) after conversion: " % job.tempdir
-    for fn in os.listdir(job.tempdir):
-        print "    %s" % fn
-    sys.stdout.flush()
-    #####
-
 
 def tar_and_copy(job, tar_suffixes, tar_globs):
     print "Tarring up results"
