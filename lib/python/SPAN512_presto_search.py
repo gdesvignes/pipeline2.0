@@ -226,6 +226,7 @@ def get_folding_command(cand, obs):
     # If the candidate was found in a fraction of the data, just fold this fraction
     if cand.npart:
         otheropts += " -start %.2f -end %.2f"%(cand.ipart/float(cand.npart), (cand.ipart+1)/float(cand.npart)) 
+	outfilenm += "_part%dx%d"%(cand.ipart, cand.npart)
 
     # Get number of subbands to use
     if obs.backend.lower() == 'pdev':
@@ -771,7 +772,7 @@ def sifting_job(job):
     # TODO
     for ipart in range(config.searching.split):
         
-	tmp_accel_cands = sifting.read_candidates(glob.glob("*part%d_DM*ACCEL_%d" % (ipart, config.searching.hi_accel_zmax)))
+	tmp_accel_cands = sifting.read_candidates(glob.glob("*part%dx*ACCEL_%d" % (ipart, config.searching.hi_accel_zmax)))
 	if len(tmp_accel_cands):
 	    tmp_accel_cands = sifting.remove_duplicate_candidates(tmp_accel_cands)
 	if len(tmp_accel_cands):
@@ -860,9 +861,7 @@ def folding_job(job):
     # Now step through the .ps files and convert them to .png and gzip them
     psfiles = glob.glob("*.ps")
     for psfile in psfiles:
-        # The '[0]' appeneded to the end of psfile is to convert only the 1st page
-        timed_execute("convert -quality 90 %s -background white -flatten -rotate 90 +matte %s" % \
-                            (psfile+"[0]", psfile[:-3]+".png"))
+        timed_execute("pstoimg -density 150 -flip cw %s" % (psfile))
         timed_execute("gzip "+psfile)
     
 
@@ -873,7 +872,7 @@ def tar_and_copy(job, tar_suffixes, tar_globs):
         print "Using glob %s" % tar_glob
         tf = tarfile.open(job.basefilenm+tar_suffix, "w:gz")
         for infile in glob.glob(tar_glob):
-            print "    Adding file %s" % infile
+            #print "    Adding file %s" % infile
             tf.add(infile)
             os.remove(infile)
         tf.close()
