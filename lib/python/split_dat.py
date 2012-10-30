@@ -62,13 +62,13 @@ def split_dat(dat_fn, npart):
 		new_info.onoff.append((info.onoff[1][0] - new_info.N, info.onoff[1][1] - new_info.N))
 
 	# Determine new filename
-	new_dat_fn = dat_fn.replace('_DM','-part%d_DM'%i)
+	new_dat_fn = dat_fn.replace('_DM','-part%dx%d_DM'%(i,npart))
 
 	# Write the .dat file
 	copy_small_dat(dat_fn, new_dat_fn, new_N, i)
 
 	# Write the .inf file
-	new_info.write_inf(inf_fn.replace('_DM','-part%d_DM'%i))	    
+	new_info.write_inf(inf_fn.replace('_DM','-part%dx%d_DM'%(i,npart)))	    
 
 	outfn.append(new_dat_fn)
 
