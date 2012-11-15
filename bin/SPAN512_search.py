@@ -170,9 +170,13 @@ def copy_zaplist(fns, workdir):
 def copy_intermediate_results(outdir, workdir):
     print "Copying contents of main results directory %s to %s"%(outdir, workdir)
     system_call("rsync -av %s/ %s" % (outdir, workdir))
-    for tarfn in glob.glob("*.tgz"):
+    gzfiles = glob.glob("*.tgz")
+    gzfiles.sort()
+    for ii, tarfn in enumerate(gzfiles):
+        print "untar %d/%d: %s"%(ii, len(gzfiles), tarfn)
         tf = tarfile.open(tarfn)
-	tf.extractall()
+        tf.extractall()
+        tf.close()
         
 
 def copy_results(resultsdir, outdir):
