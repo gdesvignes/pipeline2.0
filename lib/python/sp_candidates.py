@@ -249,7 +249,7 @@ class SinglePulseBeamPlot(upload.Uploadable):
                 upload.upload_timing_summary.setdefault('sp plots', 0) + \
                 (time.time()-starttime)
 
-    def get_upload_sproc_call(self):
+    def get_upload_sproc_call2(self):
         """Return the EXEC spSPSingleBeamCandPlotLoader string to
             upload this singlepulse plot to the PALFA common DB.
         """
@@ -261,6 +261,18 @@ class SinglePulseBeamPlot(upload.Uploadable):
             "@institution='%s', " % config.basic.institution + \
             "@pipeline='%s', " % config.basic.pipeline + \
             "@version_number='%s'" % self.versionnum
+        return sprocstr
+
+    def get_upload_sproc_call(self):
+        """Return the EXEC spSPSingleBeamCandPlotLoader string to
+            upload this singlepulse plot to the PALFA common DB.
+        """
+        sprocstr = "INSERT INTO SP_Candidate_plots (" \
+            "header_id, sp_plot_type, filename, filedata, institution, " \
+	    "pipeline, version_number) VALUES('%d', '%s', '%s', 0x%s, '%s', '%s', '%s')" \
+	    % (self.header_id, self.sp_plot_type, os.path.split(self.filename)[-1], \
+	    self.filedata.encode('hex'), config.basic.institution, \
+	    config.basic.pipeline, self.versionnum)
         return sprocstr
 
     def compare_with_db(self, dbname='default'):

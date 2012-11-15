@@ -165,7 +165,7 @@ class PeriodicityCandidate(upload.Uploadable,upload.FTPable):
            if isinstance(dep,upload.FTPable):
                dep.upload_FTP(cftp,dbname=dbname)
 
-    def get_upload_sproc_call(self):
+    def get_upload_sproc_call2(self):
         """Return the EXEC spPDMCandUploaderFindsVersion string to upload
             this candidate to the PALFA common DB.
         """
@@ -193,6 +193,25 @@ class PeriodicityCandidate(upload.Uploadable,upload.FTPable):
             "@rescaled_prepfold_sigma=%.12g, " % self.rescaled_prepfold_sigma + \
             "@sifting_period=%.12g, " % self.sifting_period + \
             "@sifting_dm=%.12g" %self.sifting_dm
+        return sprocstr
+
+    def get_upload_sproc_call(self):
+        """Return the EXEC spPDMCandUploaderFindsVersion string to upload
+            this candidate to the PALFA common DB.
+        """
+	sprocstr = "INSERT INTO PDM_Candidates (" \
+	    "header_id, cand_num, frequency, bary_frequency, period, bary_period, f_dot," \
+	    "bary_f_dot, dm, snr, coherent_power, incoherent_power, num_hits, num_harmonics, "\
+	    "institution, pipeline, version_number, proc_date, presto_sigma, prepfold_sigma," \
+	    "rescaled_prepfold_sigma, sifting_period, sifting_dm) VALUES (" \
+	    "%d, %d, %.12g, %.12g, %.12g, %.12g, %.12g, %.12g, %.12g, %.12g, %.12g, %.12g," \
+	    "%d, %d, '%s', '%s', '%s', '%s', %.12g, %.12g, %.12g, %.12g, %.12g"%( \
+	    self.header_id, self.cand_num, self.topo_freq, self.bary_freq, self.topo_period, \
+	    self.bary_period, self.topo_f_dot, self.bary_f_dot, self.dm, self.snr, \
+	    self.coherent_power, self.incoherent_power, self.num_hits, self.num_harmonics, \
+	    config.basic.institution, config.basic.pipeline, self.versionnum, \
+	    datetime.date.today().strftime("%Y-%m-%d"), self.sigma, self.prepfold_sigma, \
+	    self.rescaled_prepfold_sigma, self.sifting_period, self.sifting_dm)
         return sprocstr
 
     def compare_with_db(self, dbname='default'):
@@ -305,7 +324,7 @@ class PeriodicityCandidatePlot(upload.Uploadable):
                 upload.upload_timing_summary.setdefault(self.plot_type, 0) + \
                 (time.time()-starttime)
 
-    def get_upload_sproc_call(self):
+    def get_upload_sproc_call2(self):
         """Return the EXEC spPDMCandPlotUploader string to upload
             this candidate plot to the PALFA common DB.
         """
@@ -315,6 +334,17 @@ class PeriodicityCandidatePlot(upload.Uploadable):
             "@filename='%s', " % os.path.split(self.filename)[-1] + \
             "@filedata=0x%s" % self.filedata.encode('hex')
         return sprocstr
+
+    def get_upload_sproc_call(self):
+        """Return the EXEC spPDMCandPlotUploader string to upload
+            this candidate plot to the PALFA common DB.
+        """
+	sprocstr = "INSERT INTO PDM_Candidate_plots " \
+	    "(pdm_cand_id, pdm_plot_type, filename, filedata) VALUES (" \
+	    "%d, '%s', '%s', 0x%s"%(self.cand_id, self.plot_type, \
+	    os.path.split(self.filename)[-1], self.filedata.encode('hex'))
+        return sprocstr
+
 
     def compare_with_db(self, dbname='default'):
         """Grab corresponding candidate plot from DB and compare values.
@@ -395,7 +425,7 @@ class PeriodicityCandidateBinary(upload.FTPable,upload.Uploadable):
         mjd = int(timestamp_mjd)
         self.ftp_path = os.path.join(self.ftp_base,str(mjd))
 
-    def get_upload_sproc_call(self):
+    def get_upload_sproc_call2(self):
         """Return the EXEC spPFDBLAH string to upload
             this binary's info to the PALFA common DB.
         """
@@ -405,7 +435,15 @@ class PeriodicityCandidateBinary(upload.FTPable,upload.Uploadable):
             "@filename='%s', " % self.filename + \
             "@file_location='%s', " % self.ftp_path + \
             "@uploaded=0 "
+        return sprocstr
 
+    def get_upload_sproc_call(self):
+        """Return the EXEC spPFDBLAH string to upload
+            this binary's info to the PALFA common DB.
+        """
+        sprocstr = "INSERT INTO PDM_Candidate_Binaries_Filesystem " + \
+	    "(pdm_cand_id, pdm_plot_type, filename, file_location, uploaded) VALUES (" \
+	    "%d, '%s', '%s', '%s', 0)"%(self.cand_id, self.filetype, self.filename, self.ftp_path)
         return sprocstr
 
     def compare_with_db(self,dbname='default'):

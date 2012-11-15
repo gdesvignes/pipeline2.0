@@ -111,7 +111,7 @@ class Header(upload.Uploadable,upload.FTPable):
         # Allow Header object to return Data object's attributes
         return getattr(self.data, key)
 
-    def get_upload_sproc_call(self):
+    def get_upload_sproc_call2(self):
         """Return the EXEC spHeaderLoader string to upload
             this header to the PALFA common DB.
         """
@@ -152,6 +152,59 @@ class Header(upload.Uploadable,upload.FTPable):
             "@dec_deg=%.8f, " % self.dec_deg + \
             "@obsType='%s', " % self.obstype + \
             "@header_version=%.3f" % self.header_version
+        return sprocstr
+
+    def get_upload_sproc_call(self):
+        """Return the INSERT command to
+	execute to the common DB.
+        """
+        sprocstr = "INSERT INTO spHeaderLoader (" \
+            "obs_name, "  \
+            "beam_id, "  \
+            "original_wapp_file, " \
+            "sample_time, "  \
+            "observation_time, "  \
+            "timestamp_mjd, "  \
+            "num_samples_per_record, "  \
+            "center_freq, " \
+            "channel_bandwidth, " \
+            "num_channels_per_record, " \
+            "num_ifs, " \
+            "orig_right_ascension, " \
+            "orig_declination, " \
+            "orig_galactic_longitude, " \
+            "orig_galactic_latitude= " \
+            "source_name, " \
+            "sum_id, " \
+            "orig_start_az, " \
+            "orig_start_za, " \
+            "start_ast, " \
+            "start_lst, " \
+            "project_id, " \
+            "observers, " \
+            "file_size, " \
+            "data_size, "  \
+            "num_samples, " \
+            "orig_ra_deg, " \
+            "orig_dec_deg, " \
+            "right_ascension, " \
+            "declination, " \
+            "galactic_longitude, " \
+            "galactic_latitude, " \
+            "ra_deg, " \
+            "dec_deg, " \
+            "obsType, " \
+            "header_version) VALUES (" \ 
+	    "'%s', %d, '%s', %f, %f, %.10f, %d, %f, %f, %d, %d, %.4f, %.4f, %.8f, %.8f, '%s', %d, " \
+	    "%.4f, %.4f, %.8f, %.8f, '%s', '%s', %d, %d,%d, %.8f, %.8f, %.4f, %.4f, %.8f, %.8f, %.8f, %.8f, %s, %.3f)"%( \
+	    self.obs_name, sself.beam_id, self.original_file, self.sample_time, self.observation_time, \
+	    self.timestamp_mjd, self.num_samples_per_record, self.center_freq, self.channel_bandwidth, \
+	    self.num_channels_per_record, self.num_ifs, self.orig_right_ascension, self.orig_declination, \
+	    self.orig_galactic_longitude, self.orig_galactic_latitude, self.source_name, self.sum_id, \
+	    self.orig_start_az, self.orig_start_za, self.start_ast, self.start_lst, self.project_id, \
+	    self.observers, self.file_size, self.data_size, self.num_samples, self.orig_ra_deg, self.orig_dec_deg, \
+	    self.right_ascension, self.declination, self.galactic_longitude, self.galactic_latitude, \
+	    self.ra_deg, self.dec_deg, self.obstype, self.header_version)
         return sprocstr
 
     def compare_with_db(self, dbname='default'):
