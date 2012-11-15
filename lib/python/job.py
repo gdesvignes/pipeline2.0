@@ -517,11 +517,11 @@ def submit(job_row):
     if job_row['task']=='rfifind':
         res = [4*60*60, 1024, 16]
     elif 'search' in job_row['task']:
-        res = [24*60*60, 1024, 24]
+        res = [44*60*60, 1024, 24]
     elif job_row['task']=='sifting': # Sifting should be quick
         res = [30*60, 256, 5]
     elif 'folding' in job_row['task']:
-        res = [24*60*60, 1024, 24]
+        res = [80*60*60, 1024, 24]
     #elif job_row['task']=='tidyup':
     #    res = [30*60, 256, 5]
     options = job_row['task']
