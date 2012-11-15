@@ -981,7 +981,7 @@ def sift_directory(dir, outbasenm):
     dmstrs = ['%.2f'%infodata.infodata(inffn).DM for inffn in inffns]
 
     # Read candidates found in low acceleration searching
-    lo_accel_fns = glob.glob(os.path.join(dir, '*ACCEL_0'))
+    lo_accel_fns = glob.glob(os.path.join(dir, '*ACCEL_50'))
     lo_accel_cands = read_candidates(lo_accel_fns)
     print "Read %d candidates from %d files" % \
                 (len(lo_accel_cands), len(lo_accel_fns))
@@ -993,7 +993,7 @@ def sift_directory(dir, outbasenm):
     lo_accel_cands.print_cand_summary()
 
     # Read candidates found in high acceleration searching
-    hi_accel_fns = glob.glob(os.path.join(dir, '*ACCEL_50'))
+    hi_accel_fns = glob.glob(os.path.join(dir, '*ACCEL_100'))
     hi_accel_cands = read_candidates(hi_accel_fns)
     print "Read %d candidates from %d files" % \
                 (len(hi_accel_cands), len(hi_accel_fns))
