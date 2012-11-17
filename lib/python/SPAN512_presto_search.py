@@ -26,7 +26,6 @@ import matplotlib.pyplot as plt
 import mysifting as sifting # Temporarily until 'sifting.py' 
                             # in PRESTO is updated
 
-import split_dat
 import datafile
 import config.searching
 import config.processing
@@ -428,17 +427,39 @@ def main(filenms, workdir, resultsdir, task='all'):
     
     print "\nBeginning SPAN512 (%s) search of %s" % (task, ', '.join(job.filenms))
     print "UTC time is:  %s"%(time.asctime(time.gmtime()))
+
+    # Split mode
+    sjob = []
+    nsplit = config.searching.split
+    for i in range(nsplit):
+        # Construct the raw file
+	# TODO, splitting works only with a single file !
+	new_filenms = job.filenmstr.replace('.fits', '-part%dx%d.fits'%(i,nsplit) )
+	cmd = "%s %s %s -s %.1f -e %.1f"%(os.path.join(psrfits_utilsdir, 'fits_extract'), job.filenmstr, new_filenms, i/float(nsplit), (i+1)/float(nsplit))
+
+	timed_execute(cmd, stdout="%s_rfifind.out" % job.basefilenm)
+
+	filenms = []
+	filenms.append(new_filenms)
+
+	# Construct the job object
+	sjob.append( set_up_job(filenms, workdir, resultsdir, task) )
     
     try:
         if job.task == 'rfifind':
 	    rfifind_job(job)
+	    for i in range(nsplit):
+	        rfifind_job(sjob[i])
+
         elif job.task == 'search':
 	    search_job(job)
-        #elif job.task == 'sifting':
-	#    sifting_job(job)
+	    for i in range(nsplit):
+	        search_job(sjob[i])
+
         elif job.task == 'folding':
 	    sifting_job(job)
 	    folding_job(job)
+
 	elif job.task == 'all':
 	    rfifind_job(job)
 	    search_job(job)
@@ -517,9 +538,6 @@ def rfifind_job(job):
         cmd += " -freqsig %.2f"%config.searching.freqsig   
 
     job.rfifind_time += timed_execute(cmd, stdout="%s_rfifind.out" % job.basefilenm)
-    # Find the fraction that was suggested to be masked
-    # Note:  Should we stop processing if the fraction is
-    #        above some large value?  Maybe 30%?
 
 
 def search_job(job):
@@ -594,73 +612,24 @@ def search_job(job):
                 fftnm = basenm+".fft"
                 infnm = basenm+".inf"
 
-                # Do the single-pulse search
-                cmd = "single_pulse_search.py -p -m %f -t %f %s"%\
-                      (config.searching.singlepulse_maxwidth, \
-                       config.searching.singlepulse_threshold, datnm)
-                job.singlepulse_time += timed_execute(cmd, stdout=os.devnull)
-                try:
-                    shutil.move(basenm+".singlepulse", job.workdir)
-                except: pass
 
-                if config.searching.use_zerodm_sp:
+		if not 'part' in job.filenmstr:
+		    # Do the single-pulse search
 		    cmd = "single_pulse_search.py -p -m %f -t %f %s"%\
 			  (config.searching.singlepulse_maxwidth, \
-			   config.searching.singlepulse_threshold, datnm_zerodm)
+			   config.searching.singlepulse_threshold, datnm)
 		    job.singlepulse_time += timed_execute(cmd, stdout=os.devnull)
 		    try:
-			shutil.move(basenm_zerodm+".singlepulse", job.workdir)
+			shutil.move(basenm+".singlepulse", job.workdir)
 		    except: pass
 
-
-		# Search the splitted obs - High acceleration
-		if config.searching.split:
-		    sdatnms = split_dat.split_dat(datnm, config.searching.split)
-
-		    for sdatnm in sdatnms:
-			sbasenm = sdatnm.rstrip('.dat')
-			sfftnm = sbasenm+".fft"
-			sinfnm = sbasenm+".inf"
-
-			# FFT, zap, and de-redden
-			cmd = "realfft %s"%sdatnm
-			job.FFT_time += timed_execute(cmd, stdout=os.devnull)
-			cmd = "zapbirds -zap -zapfile %s -baryv %.6g %s"%\
-			      (zaplist, job.baryv, sfftnm)
-			job.FFT_time += timed_execute(cmd, stdout=os.devnull)
-			cmd = "rednoise %s"%sfftnm
-			job.FFT_time += timed_execute(cmd, stdout=os.devnull)
+		    if config.searching.use_zerodm_sp:
+			cmd = "single_pulse_search.py -p -m %f -t %f %s"%\
+			      (config.searching.singlepulse_maxwidth, \
+			       config.searching.singlepulse_threshold, datnm_zerodm)
+			job.singlepulse_time += timed_execute(cmd, stdout=os.devnull)
 			try:
-			    os.rename(sbasenm+"_red.fft", sfftnm)
-			except: pass
-
-			# Do the low-acceleration search
-			cmd = "accelsearch -harmpolish -numharm %d -sigma %f " \
-				"-zmax %d -flo %f %s"%\
-				(config.searching.hi_accel_numharm, \
-				 config.searching.hi_accel_sigma, \
-				 config.searching.hi_accel_zmax, \
-				 config.searching.hi_accel_flo, sfftnm)
-			job.hi_accelsearch_time += timed_execute(cmd, stdout=os.devnull)
-			try:
-			    os.remove(sbasenm+"_ACCEL_%d.txtcand" % config.searching.hi_accel_zmax)
-			except: pass
-
-			try:  # This prevents errors if there are no cand files to copy
-			    shutil.move(sbasenm+"_ACCEL_%d.cand" % config.searching.hi_accel_zmax, job.workdir)
-			    shutil.move(sbasenm+"_ACCEL_%d" % config.searching.hi_accel_zmax, job.workdir)
-			except: pass
-
-			# Move the .inf files
-			try:
-			    shutil.move(sinfnm, job.workdir)
-			except: pass
-			# Remove the .dat and .fft files
-			try:
-			    os.remove(sdatnm)
-			except: pass
-			try:
-			    os.remove(sfftnm)
+			    shutil.move(basenm_zerodm+".singlepulse", job.workdir)
 			except: pass
 
 
@@ -676,20 +645,35 @@ def search_job(job):
                     os.rename(basenm+"_red.fft", fftnm)
                 except: pass
 
-                # Do the low-acceleration search
+		if 'part' in job.filenmstr:
+		    numharm = config.searching.lo_accel_numharm
+		    sigma = config.searching.lo_accel_sigma
+		    zmax = config.searching.lo_accel_zmax
+		    flo = config.searching.lo_accel_flo
+		else:
+		    numharm = config.searching.hi_accel_numharm
+		    sigma = config.searching.hi_accel_sigma
+		    zmax = config.searching.hi_accel_zmax
+		    flo = config.searching.hi_accel_flo
+
+
+
+                # Do the acceleration search
                 cmd = "accelsearch -harmpolish -numharm %d -sigma %f " \
                         "-zmax %d -flo %f %s"%\
-                        (config.searching.lo_accel_numharm, \
-                         config.searching.lo_accel_sigma, \
-                         config.searching.lo_accel_zmax, \
-                         config.searching.lo_accel_flo, fftnm)
-                job.lo_accelsearch_time += timed_execute(cmd, stdout=os.devnull)
+                        (numharm, sigma, zmax, flo, fftnm)
+		# Time it	
+		if 'part' in job.filenmstr:	
+		    job.high_accelsearch_time += timed_execute(cmd, stdout=os.devnull)
+		else:
+		    job.lo_accelsearch_time += timed_execute(cmd, stdout=os.devnull)
+
                 try:
-                    os.remove(basenm+"_ACCEL_%d.txtcand" % config.searching.lo_accel_zmax)
+                    os.remove(basenm+"_ACCEL_%d.txtcand" % zmax)
                 except: pass
                 try:  # This prevents errors if there are no cand files to copy
-                    shutil.move(basenm+"_ACCEL_%d.cand" % config.searching.lo_accel_zmax, job.workdir)
-                    shutil.move(basenm+"_ACCEL_%d" % config.searching.lo_accel_zmax, job.workdir)
+                    shutil.move(basenm+"_ACCEL_%d.cand" % zmax, job.workdir)
+                    shutil.move(basenm+"_ACCEL_%d" % zmax, job.workdir)
                 except: pass
 
                 # Move the .inf files
