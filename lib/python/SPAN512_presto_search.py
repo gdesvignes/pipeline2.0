@@ -435,7 +435,7 @@ def main(filenms, workdir, resultsdir, task='all'):
         # Construct the raw file
 	# TODO, splitting works only with a single file !
 	new_filenms = job.filenmstr.replace('.fits', '-part%dx%d.fits'%(i,nsplit) )
-	cmd = "%s %s %s -s %.1f -e %.1f"%(os.path.join(psrfits_utilsdir, 'fits_extract'), job.filenmstr, new_filenms, i/float(nsplit), (i+1)/float(nsplit))
+	cmd = "%s %s %s -s %.1f -e %.1f"%(os.path.join(config.basic.psrfits_utilsdir, 'fits_extract'), job.filenmstr, new_filenms, i/float(nsplit), (i+1)/float(nsplit))
 
 	timed_execute(cmd, stdout="%s_rfifind.out" % job.basefilenm)
 
