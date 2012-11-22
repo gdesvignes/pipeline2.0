@@ -235,7 +235,8 @@ def get_folding_command(cand, obs):
     return "prepfold -noxwin -accelcand %d -accelfile %s.cand -dm %.2f -o %s " \
                 "-nsub %d -npart %d %s -n %d -npfact %d -ndmfact %d %s %s" % \
            (cand.candnum, cand.filename, cand.DM, outfilenm, nsub,
-            npart, otheropts, N, Mp, Mdm, mask, foldfiles)
+            npart, otheropts, N, Mp, Mdm, mask, foldfiles) , \
+	    outfilenm
 
 
 class obs_info:
@@ -813,7 +814,15 @@ def folding_job(job):
             break
         if cand.sigma >= config.searching.to_prepfold_sigma:
             print "...folding"
-            job.folding_time += timed_execute(get_folding_command(cand, job))
+	    folding_cmd, outfilenm = get_folding_command(cand, job) 
+            job.folding_time += timed_execute(folding_cmd)
+
+	    # now apply KJ Algorithm
+	    kj_score_cmd = "%s -f %s"%(os.path.join(config.basic.psrfits_utilsdir, 'bin/autos2.exe'), \
+			outfilenm+'_ACCEL_Cand_%d.pfd'%cand.candnum)
+	    job.folding_time += timed_execute(kj_score_cmd)
+
+
             cands_folded += 1
     job.num_cands_folded = cands_folded
     
@@ -905,10 +914,12 @@ def folding_clean_up(job):
     # Tar up the results files 
     tar_suffixes = ["_pfd.tgz",
 		"_bestprof.tgz",
-		"_pfd_rat.tgz"]
+		"_pfd_rat.tgz",
+		"_qual.tgz"]
     tar_globs = ["*.pfd",
 		"*.pfd.bestprof",
-		"*.pfd.rat"]
+		"*.pfd.rat",
+		"*.qual"]
     tar_and_copy(job, tar_suffixes, tar_globs)
 
 
@@ -932,7 +943,8 @@ def final_clean_up(job):
                     "_inf.tgz",
                     "_pfd.tgz",
                     "_bestprof.tgz",
-                    "_pfd_rat.tgz"]
+                    "_pfd_rat.tgz",
+		    "_qual.tgz"]
     tar_globs = ["*_ACCEL_%d"%config.searching.lo_accel_zmax,
                  "*_ACCEL_%d"%config.searching.hi_accel_zmax,
                  "*_ACCEL_%d.cand"%config.searching.lo_accel_zmax,
@@ -941,7 +953,8 @@ def final_clean_up(job):
                  "*_DM[0-9]*.inf",
                  "*.pfd",
                  "*.pfd.bestprof",
-                 "*.pfd.rat"]
+                 "*.pfd.rat",
+		 "*.qual"]
     print "Tarring up results"
     for (tar_suffix, tar_glob) in zip(tar_suffixes, tar_globs):
         print "Opening tarball %s" % (job.basefilenm+tar_suffix)

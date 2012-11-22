@@ -15,6 +15,7 @@ pipelinedir = "/homes/borgii/plazar/research/PALFA/pipeline2.0_clean/pipeline2.0
 # This is the root directory of the source for the psrfits_utils code
 # as pulled from github
 psrfits_utilsdir = "/usr/local/src/psrfits_utils_git/psrfits_utils"
+kj_utilsdir = "/usr/local/src/psrfits_utils_git/psrfits_utils"
 
 # A boolean value that determines if raw data is deleted when results
 # for a job are successfully uploaded to the common DB, or if the
