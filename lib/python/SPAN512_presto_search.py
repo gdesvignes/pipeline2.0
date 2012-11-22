@@ -646,16 +646,15 @@ def search_job(job):
                 except: pass
 
 		if 'part' in job.filenmstr:
-		    numharm = config.searching.lo_accel_numharm
-		    sigma = config.searching.lo_accel_sigma
-		    zmax = config.searching.lo_accel_zmax
-		    flo = config.searching.lo_accel_flo
-		else:
 		    numharm = config.searching.hi_accel_numharm
 		    sigma = config.searching.hi_accel_sigma
 		    zmax = config.searching.hi_accel_zmax
 		    flo = config.searching.hi_accel_flo
-
+		else:
+		    numharm = config.searching.lo_accel_numharm
+		    sigma = config.searching.lo_accel_sigma
+		    zmax = config.searching.lo_accel_zmax
+		    flo = config.searching.lo_accel_flo
 
 
                 # Do the acceleration search
@@ -664,7 +663,7 @@ def search_job(job):
                         (numharm, sigma, zmax, flo, fftnm)
 		# Time it	
 		if 'part' in job.filenmstr:	
-		    job.high_accelsearch_time += timed_execute(cmd, stdout=os.devnull)
+		    job.hi_accelsearch_time += timed_execute(cmd, stdout=os.devnull)
 		else:
 		    job.lo_accelsearch_time += timed_execute(cmd, stdout=os.devnull)
 
