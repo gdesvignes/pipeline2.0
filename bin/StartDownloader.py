@@ -22,7 +22,7 @@ def main():
             else:
                 # No files successfully download this iteration
                 # Increase sleep time
-                delay = min((delay*2, 32))
+                delay = min((delay*2, 8))
         except Exception, e:
             if config.email.send_on_crash:
                 msg  = '*** Downloader has crashed! ***\n\n'
