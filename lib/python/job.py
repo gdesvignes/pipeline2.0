@@ -106,7 +106,7 @@ def create_jobs_for_new_files():
                             "created_at, " \
                             "job_id, " \
                             "updated_at) " \
-                       "SELECT id, '%s', (SELECT LAST_INSERT_ROWID()), '%s' " \
+                       "SELECT id, '%s', (SELECT LAST_INSERT_ID()), '%s' " \
                        "FROM files " \
                        "WHERE filename IN ('%s')" % \
                        (jobtracker.nowstr(), jobtracker.nowstr(), \
@@ -153,7 +153,7 @@ def create_parallel_search_jobs():
                                 "created_at, " \
                                 "job_id, " \
                                 "updated_at) " \
-			       "SELECT id, '%s', (SELECT LAST_INSERT_ROWID()), '%s' " \
+			       "SELECT id, '%s', (SELECT LAST_INSERT_ID()), '%s' " \
 			       "FROM files " \
 			       "WHERE id=%d" % \
 			       (jobtracker.nowstr(), jobtracker.nowstr(), \
@@ -275,7 +275,7 @@ def create_parallel_folding_jobs():
                                 "created_at, " \
                                 "job_id, " \
                                 "updated_at) " \
-				"SELECT id, '%s', (SELECT LAST_INSERT_ROWID()), '%s' " \
+				"SELECT id, '%s', (SELECT LAST_INSERT_ID()), '%s' " \
 				"FROM files " \
 				"WHERE id=%d" % \
 				(jobtracker.nowstr(), jobtracker.nowstr(), int(file_id)))
@@ -515,13 +515,13 @@ def submit(job_row):
 
     # Specify requested resources for job submission
     if job_row['task']=='rfifind':
-        res = [4*60*60, 1024, 16]
+        res = [4*60*60, 1024, 25]
     elif 'search' in job_row['task']:
-        res = [44*60*60, 1024, 24]
+        res = [44*60*60, 1024, 28]
     elif job_row['task']=='sifting': # Sifting should be quick
         res = [30*60, 256, 5]
     elif 'folding' in job_row['task']:
-        res = [80*60*60, 1024, 24]
+        res = [96*60*60, 3000, 28]
     #elif job_row['task']=='tidyup':
     #    res = [30*60, 256, 5]
     options = job_row['task']
