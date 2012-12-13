@@ -442,6 +442,13 @@ class NuppiPsrfitsData(PsrfitsData):
     filename_re = re.compile(r'nuppi_(?P<mjd>\d{5})_(?P<source>.*)_' \
                                 r'(?P<scan>\d{6})_(?P<fileno>\d{4}).fits')
 
+class NuppiSplitPsrfitsData(PsrfitsData):
+    """PSR fits Data object for NUPPI splitted data.
+    """
+    filename_re = re.compile(r'nuppi_(?P<mjd>\d{5})_(?P<source>.*)_' \
+                                r'(?P<scan>\d{6})_(?P<fileno>\d{4})' \
+				r'-part(?P<ipart>\d{1})x(?P<npart>\d{1}).fits')
+
 class MockPsrfitsData(PsrfitsData):
     """PSR fits Data object for MockSpec data.
     """
