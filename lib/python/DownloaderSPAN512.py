@@ -17,7 +17,7 @@ def make_request(dbname='default'):
 
     # Ask to restore num_beams
     db = database.Database(dbname)
-    QUERY = "SELECT obs_id FROM full_processing WHERE status='available' LIMIT %d"%num_beams
+    QUERY = "SELECT f.obs_id FROM full_processing as f LEFT JOIN  processing AS p ON f.obs_id = p.obs_id WHERE f.status='available' AND p.details is NULL LIMIT %d"%num_beams
     db.cursor.execute(QUERY)
     obs_ids = [row[0] for row in db.cursor.fetchall()]
 
