@@ -157,7 +157,7 @@ def copy_data(fns, workdir):
     for fn in fns:
         print "Copying data %s to %s"%(fn, workdir)
         if config.basic.use_HPSS:
-	    system_call("xrdcp %s %s"%(fn.replace('cchpssglast:','root://ccxroot:1999/'), workdir))
+	    system_call("xrdcp -s %s %s"%(fn.replace('cchpssglast:','root://ccxroot:1999/'), workdir))
 	else:
 	    shutil.copy(fn, workdir)
 
