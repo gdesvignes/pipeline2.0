@@ -201,18 +201,22 @@ def get_folding_command(cand, obs):
     if p < 0.002:
         Mp, Mdm, N = 2, 2, 24
         npart = 50
+	nsub = 128
         otheropts = "-ndmfact 3"
     elif p < 0.05:
         Mp, Mdm, N = 2, 1, 50
         npart = 40
+	nsub = 128
         otheropts = "-pstep 1 -pdstep 2 -dmstep 3"
     elif p < 0.5:
         Mp, Mdm, N = 1, 1, 100
         npart = 30
+	nsub = 64
         otheropts = "-pstep 1 -pdstep 2 -dmstep 1 -nodmsearch"
     else:
         Mp, Mdm, N = 1, 1, 200
         npart = 30
+	nsub = 64
         otheropts = "-nopdsearch -pstep 1 -pdstep 2 -dmstep 1 -nodmsearch"
 
     # If prepfold is instructed to use more subbands than there are rows in the PSRFITS file
@@ -222,21 +226,10 @@ def get_folding_command(cand, obs):
     if npart > obs.numrows:
         npart = obs.numrows
 
-    # If the candidate was found in a fraction of the data, just fold this fraction
-    if cand.npart:
-        otheropts += " -start %.2f -end %.2f"%(cand.ipart/float(cand.npart), (cand.ipart+1)/float(cand.npart)) 
-	outfilenm += "_part%dx%d"%(cand.ipart, cand.npart)
-
-    # Get number of subbands to use
-    if obs.backend.lower() == 'pdev':
-        nsub = 96
-    else:
-        nsub = 64
     return "prepfold -noxwin -accelcand %d -accelfile %s.cand -dm %.2f -o %s " \
                 "-nsub %d -npart %d %s -n %d -npfact %d -ndmfact %d %s %s" % \
            (cand.candnum, cand.filename, cand.DM, outfilenm, nsub,
-            npart, otheropts, N, Mp, Mdm, mask, foldfiles) , \
-	    outfilenm
+            npart, otheropts, N, Mp, Mdm, mask, foldfiles), outfilenm
 
 
 class obs_info:
@@ -459,13 +452,13 @@ def main(filenms, workdir, resultsdir, task='all'):
 
         elif job.task == 'folding':
 	    sifting_job(job)
-	    folding_job(job)
+	    folding_job(job, sjob)
 
 	elif job.task == 'all':
 	    rfifind_job(job)
 	    search_job(job)
 	    sifting_job(job)
-	    folding_job(job)
+	    folding_job(job, sjob)
     except:
         print "***********************ERRORS!************************"
         print "  Search has been aborted due to errors encountered."
@@ -796,7 +789,7 @@ def sifting_job(job):
         job.all_accel_cands.print_cand_summary(job.basefilenm+".accelcands.summary")
         # Write out sifting comprehensive report of bad candidates
         job.all_accel_cands.write_cand_report(job.basefilenm+".accelcands.report")
-        timed_execute("gzip --best %s" % job.basefilenm+".accelcands.report")
+        timed_execute("gzip -f --best %s" % job.basefilenm+".accelcands.report")
 
         # Moving of results to resultsdir now happens in clean_up(...)
         # shutil.copy(job.basefilenm+".accelcands", job.outputdir)
@@ -804,7 +797,7 @@ def sifting_job(job):
     job.sifting_time = time.time() - job.sifting_time
 
 
-def folding_job(job):
+def folding_job(job, sjob):
 
     # Fold the best candidates
     cands_folded = 0
@@ -814,11 +807,16 @@ def folding_job(job):
             break
         if cand.sigma >= config.searching.to_prepfold_sigma:
             print "...folding"
-	    folding_cmd, outfilenm = get_folding_command(cand, job) 
+
+	    # If the candidate was found in a fraction of the data, just fold this fraction
+	    if cand.npart:
+	        folding_cmd, outfilenm = get_folding_command(cand, sjob[cand.ipart]) 
+	    else:
+	        folding_cmd, outfilenm = get_folding_command(cand, job) 
             job.folding_time += timed_execute(folding_cmd)
 
 	    # now apply KJ Algorithm
-	    kj_score_cmd = "%s -f %s"%(os.path.join(config.basic.psrfits_utilsdir, 'bin/autos2.exe'), \
+	    kj_score_cmd = "%s -f %s"%(os.path.join(config.basic.kj_utilsdir, 'bin/autos2.exe'), \
 			outfilenm+'_ACCEL_Cand_%d.pfd'%cand.candnum)
 	    job.folding_time += timed_execute(kj_score_cmd)
 
@@ -854,7 +852,7 @@ def folding_job(job):
     psfiles = glob.glob("*.ps")
     for psfile in psfiles:
         timed_execute("pstoimg -density 150 -flip cw %s" % (psfile))
-        timed_execute("gzip "+psfile)
+        timed_execute("gzip -f "+psfile)
     
 
 def tar_and_copy(job, tar_suffixes, tar_globs):
