@@ -106,7 +106,7 @@ def create_jobs_for_new_files():
                             "created_at, " \
                             "job_id, " \
                             "updated_at) " \
-                       "SELECT id, '%s', (SELECT LAST_INSERT_ID()), '%s' " \
+                       "SELECT id, '%s', (SELECT LAST_INSERT_ROW_ID()), '%s' " \
                        "FROM files " \
                        "WHERE filename IN ('%s')" % \
                        (jobtracker.nowstr(), jobtracker.nowstr(), \
@@ -153,7 +153,7 @@ def create_parallel_search_jobs():
                                 "created_at, " \
                                 "job_id, " \
                                 "updated_at) " \
-			       "SELECT id, '%s', (SELECT LAST_INSERT_ID()), '%s' " \
+			       "SELECT id, '%s', (SELECT LAST_INSERT_ROW_ID()), '%s' " \
 			       "FROM files " \
 			       "WHERE id=%d" % \
 			       (jobtracker.nowstr(), jobtracker.nowstr(), \
@@ -275,7 +275,7 @@ def create_parallel_folding_jobs():
                                 "created_at, " \
                                 "job_id, " \
                                 "updated_at) " \
-				"SELECT id, '%s', (SELECT LAST_INSERT_ID()), '%s' " \
+				"SELECT id, '%s', (SELECT LAST_INSERT_ROW_ID()), '%s' " \
 				"FROM files " \
 				"WHERE id=%d" % \
 				(jobtracker.nowstr(), jobtracker.nowstr(), int(file_id)))
