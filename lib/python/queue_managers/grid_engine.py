@@ -91,7 +91,7 @@ class GEManager(queue_managers.generic_interface.PipelineQueueManager):
 	    opts = ",OPTIONS='%s'"%opts
 
 	if config.basic.use_HPSS:
-	    hpss_opt = ",hpss=1"
+	    hpss_opt = ",xrootd=1"
         else: hpss_opt = ""  
 
 	if config.basic.use_sps:
@@ -99,7 +99,7 @@ class GEManager(queue_managers.generic_interface.PipelineQueueManager):
         else: sps_opt = ""  
 
 	# Submit
-        cmd = "qsub  -V -v DATAFILES='%s',OUTDIR='%s'%s -l ct=%d,vmem=%dM,fsize=%dG%s%s -N %s -e %s -o %s %s" %\
+        cmd = "qsub -P P_glast_pulsar -V -v DATAFILES='%s',OUTDIR='%s'%s -l ct=%d,vmem=%dM,fsize=%dG%s%s -N %s -e %s -o %s %s" %\
                    (';'.join(datafiles), outdir, opts, cputime, memory, fsize, hpss_opt, sps_opt, self.job_basename,\
                       errorlog, stdoutlog, script)
         queue_id, error, comm_err = self._exec_check_for_failure(cmd)
