@@ -1,13 +1,29 @@
 import sys
-import sqlite3
 import time
 import datetime
 import types
 
+import pyodbc
 #import prettytable
 
 import debug 
 import config.background
+
+# Connecting from Linux
+DATABASES = {
+    'local': {
+        'DATABASE': 'span512',
+        'UID' :  'desvigne',
+        'PWD' :  '2PYX2hgypv',
+        'HOST': 'ccmysql.in2p3.fr',
+        'DSN' :  'MySQLDSN'
+        },
+}
+
+# Set defaults
+DEFAULTDB = 'local'
+DATABASES['default'] = DATABASES[DEFAULTDB]
+
 
 
 class JobtrackerDatabase(object):
@@ -42,14 +58,8 @@ class JobtrackerDatabase(object):
             Outputs:
                 None
         """
-        self.conn = sqlite3.connect(self.db, timeout=timeout)
-        if autocommit:
-            self.conn.isolation_level = None
-        else:
-            # Don't allow any other connections to read/write database during
-            # a transaction.
-            self.conn.isolation_level = 'EXCLUSIVE'
-        self.conn.row_factory = sqlite3.Row
+	db = 'default'
+	self.conn = pyodbc.connect(autocommit=autocommit, timeout=timeout, **DATABASES[db])
         self.cursor = self.conn.cursor()
         self.attach(self.db, 'jt')
 
@@ -237,7 +247,7 @@ class JobtrackerDatabase(object):
 def nowstr():
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-def query(queries, fetchone=False):
+def query(queries, fetchone=False, db="default"):
     """Execute multiple queries to the sqlite3 jobtracker database.
         All queries will be executed as a single transaction.
         Return the result of the last query, or the ID of the last
@@ -255,6 +265,8 @@ def query(queries, fetchone=False):
                         depending on 'fetchone'. Or, the ID of the last
                         entry INSERT'ed (for INSERT statements).
     """
+    if not queries:
+        return
     if isinstance(queries, (types.StringType, types.UnicodeType)):
         # Make a list if only a single string is pass in
         queries = [queries]
@@ -262,25 +274,40 @@ def query(queries, fetchone=False):
     count = 0
     while not_connected:
         try:
-            db_conn = sqlite3.connect(config.background.jobtracker_db,timeout=40.0)
-            db_conn.isolation_level = 'DEFERRED'
-            db_conn.row_factory = sqlite3.Row
+	    db_conn = pyodbc.connect(autocommit='FALSE', **DATABASES[db])
             db_cur = db_conn.cursor()
             for q in queries:
                 if debug.JOBTRACKER:
                     print q
                 db_cur.execute(q)
             db_conn.commit()
-            if db_cur.lastrowid:
-                results = db_cur.lastrowid
+            if "INSERT" in queries[0] or "UPDATE" in queries[0]:
+		db_cur.execute("SELECT LAST_INSERT_ID()")
+                db_conn.commit()
+		results = db_cur.fetchone()[0]
+                #results = db_cur.lastrowid
             else:
+		results = []
                 if fetchone:
-                    results = db_cur.fetchone()
+                    row = db_cur.fetchone()
+		    if isinstance(row, pyodbc.Row): #and len(row) > 1:
+		        if len(row) > 1:
+			    results = dict((t[0], value) for t, value in zip(db_cur.description, row)) 
+			else:
+			    results = row[0]
                 else:
-                    results = db_cur.fetchall()
+                    rows = db_cur.fetchall()
+
+		    if rows:
+		        for row in rows:
+		            if isinstance(row, pyodbc.Row): #and len(row) > 1:
+			        results.append( dict((t[0], value) for t, value in zip(db_cur.description, row)) )
+			    else: results.append(row)
+
+		
             db_conn.close()
             not_connected = False
-        except sqlite3.OperationalError, e:
+        except pyodbc.Error, e:
             try:
                 db_conn.rollback()
                 db_conn.close()
@@ -292,12 +319,13 @@ def query(queries, fetchone=False):
                     raise
                 print "Couldn't connect to DB for %d seconds. Will continue trying. " \
                         "Error message: %s" % (count, str(e))
+		print "Queries were:\n", queries
             time.sleep(1)
             count+=1
     return results
 
 
-def execute(queries, arglists, fetchone=False):
+def execute(queries, arglists, fetchone=False, db="default"):
     """Execute multiple queries to the sqlite3 jobtracker database.
         All queries will be executed as a single transaction.
         Return the result of the last query, or the ID of the last
@@ -318,27 +346,48 @@ def execute(queries, arglists, fetchone=False):
                         depending on 'fetchone'. Or, the ID of the last
                         entry INSERT'ed (for INSERT statements).
     """
+    if not queries:
+        return
+    if isinstance(queries, (types.StringType, types.UnicodeType)):
+        # Make a list if only a single string is pass in
+        queries = [queries]
     not_connected = True
     count = 0
     while not_connected:
         try:
-            db_conn = sqlite3.connect(config.background.jobtracker_db,timeout=40.0)
-            db_conn.isolation_level = 'DEFERRED'
-            db_conn.row_factory = sqlite3.Row
+	    db_conn = pyodbc.connect(autocommit='FALSE', **DATABASES[db])
             db_cur = db_conn.cursor()
-            for q, args in zip(queries, arglists):
+            for q,args in zip(queries, arglists):
+                if debug.JOBTRACKER:
+                    print q, args
                 db_cur.execute(q, args)
             db_conn.commit()
-            if db_cur.lastrowid:
-                results = db_cur.lastrowid
+            if "INSERT" in queries[0] or "UPDATE" in queries[0]:
+		db_cur.execute("SELECT LAST_INSERT_ID()")
+                db_conn.commit()
+		results = db_cur.fetchone()[0]
             else:
+		results = []
                 if fetchone:
-                    results = db_cur.fetchone()
+                    row = db_cur.fetchone()
+		    if isinstance(row, pyodbc.Row): #and len(row) > 1:
+		        if len(row) > 1:
+			    results = dict((t[0], value) for t, value in zip(db_cur.description, row)) 
+			else:
+			    results = row[0]
                 else:
-                    results = db_cur.fetchall()
+                    rows = db_cur.fetchall()
+
+		    if rows:
+		        for row in rows:
+		            if isinstance(row, pyodbc.Row): #and len(row) > 1:
+			        results.append( dict((t[0], value) for t, value in zip(db_cur.description, row)) )
+			    else: results.append(row)
+
+		
             db_conn.close()
             not_connected = False
-        except sqlite3.OperationalError, e:
+        except pyodbc.Error, e:
             try:
                 db_conn.rollback()
                 db_conn.close()
@@ -346,8 +395,13 @@ def execute(queries, arglists, fetchone=False):
                 # Connection wasn't established, 'db_conn' is not defined.
                 pass
             if (count % 60) == 0:
+                if count > 1:
+                    raise
                 print "Couldn't connect to DB for %d seconds. Will continue trying. " \
                         "Error message: %s" % (count, str(e))
+		print "Queries were:\n"
+                for q,args in zip(queries, arglists):
+                    print q, args
             time.sleep(1)
             count+=1
     return results

@@ -106,7 +106,7 @@ def create_jobs_for_new_files():
                             "created_at, " \
                             "job_id, " \
                             "updated_at) " \
-                       "SELECT id, '%s', (SELECT LAST_INSERT_ROW_ID()), '%s' " \
+                       "SELECT id, '%s', (SELECT LAST_INSERT_ID()), '%s' " \
                        "FROM files " \
                        "WHERE filename IN ('%s')" % \
                        (jobtracker.nowstr(), jobtracker.nowstr(), \
@@ -153,7 +153,7 @@ def create_parallel_search_jobs():
                                 "created_at, " \
                                 "job_id, " \
                                 "updated_at) " \
-			       "SELECT id, '%s', (SELECT LAST_INSERT_ROW_ID()), '%s' " \
+			       "SELECT id, '%s', (SELECT LAST_INSERT_ID()), '%s' " \
 			       "FROM files " \
 			       "WHERE id=%d" % \
 			       (jobtracker.nowstr(), jobtracker.nowstr(), \
@@ -275,7 +275,7 @@ def create_parallel_folding_jobs():
                                 "created_at, " \
                                 "job_id, " \
                                 "updated_at) " \
-				"SELECT id, '%s', (SELECT LAST_INSERT_ROW_ID()), '%s' " \
+				"SELECT id, '%s', (SELECT LAST_INSERT_ID()), '%s' " \
 				"FROM files " \
 				"WHERE id=%d" % \
 				(jobtracker.nowstr(), jobtracker.nowstr(), int(file_id)))
@@ -362,6 +362,7 @@ def update_jobs_status_from_queue():
             if config.jobpooler.queue_manager.had_errors(submit['queue_id']):
                 # Errors during processing...
                 errormsg = config.jobpooler.queue_manager.get_errors(submit['queue_id'])
+		errormsg = errormsg.replace('\"','')
 
                 if errormsg.count("\n") > 100:
                     errormsg = string.join(errormsg.split("\n")[:50],"\n")
@@ -376,17 +377,14 @@ def update_jobs_status_from_queue():
                 arglists = []
                 queries.append("UPDATE jobs " \
                                "SET status='failed', " \
-                                    "updated_at=?, " \
+                                    "updated_at='%s', " \
                                     "details='Errors during processing' " \
-                               "WHERE id=?")
-                arglists.append((jobtracker.nowstr(), submit['job_id']))
-                queries.append("UPDATE job_submits " \
-                               "SET status='processing_failed', " \
-                                    "details=?, " \
-                                    "updated_at=? " \
-                               "WHERE id=?")
-                arglists.append((errormsg, jobtracker.nowstr(), submit['id']))
-                jobtracker.execute(queries, arglists)
+                               "WHERE id=%d" % (jobtracker.nowstr(), submit['job_id']))
+                queries.append("UPDATE job_submits SET status='processing_failed', " \
+                                    "details=\"%s\", updated_at='%s' " \
+                               "WHERE id=%d"%(errormsg, jobtracker.nowstr(), submit['id']))
+		print queries
+                jobtracker.query(queries)
             else:
                 # No errors. Woohoo!
                 # Mark job and job_submit entries with status 'processed'
@@ -517,7 +515,7 @@ def submit(job_row):
     if job_row['task']=='rfifind':
         res = [4*60*60, 1024, 25]
     elif 'search' in job_row['task']:
-        res = [44*60*60, 1024, 28]
+        res = [165240, 1024, 28] # 45.9 hrs
     elif job_row['task']=='sifting': # Sifting should be quick
         res = [30*60, 256, 5]
     elif 'folding' in job_row['task']:
@@ -571,17 +569,15 @@ def submit(job_row):
                             "created_at, " \
                             "updated_at, " \
                             "details) " \
-                      "VALUES (?, ?, ?, ?, ?)" )
-        arglist.append( ( job_row['id'], 'precheck_failed', \
+                      "VALUES (%d, %s, '%s', '%s', %s)" % ( job_row['id'], 'precheck_failed', \
                         jobtracker.nowstr(), jobtracker.nowstr(), \
                         errormsg) )
         queries.append("UPDATE jobs " \
                        "SET status='terminal_failure', " \
                             "details='Failed presubmission check', " \
-                            "updated_at=? " \
-                       "WHERE id=?" )
-        arglist.append( (jobtracker.nowstr(), job_row['id']) )
-        jobtracker.execute(queries, arglist)
+                            "updated_at='%s'" \
+                       "WHERE id=%d"% (jobtracker.nowstr(), job_row['id']) )
+        jobtracker.query(queries)
 
     except (queue_managers.QueueManagerJobFatalError,\
               datafile.DataFileError):
@@ -603,17 +599,15 @@ def submit(job_row):
                             "created_at, " \
                             "updated_at, " \
                             "details) " \
-                      "VALUES (?, ?, ?, ?, ?)" )
-        arglist.append( ( job_row['id'], 'submission_failed', \
+                      "VALUES (%d, %s, '%s', '%s', %s)" % ( job_row['id'], 'submission_failed', \
                         jobtracker.nowstr(), jobtracker.nowstr(), \
                         errormsg) )
         queries.append("UPDATE jobs " \
                        "SET status='failed', " \
                             "details='Error while submitting job', " \
-                            "updated_at=? " \
-                       "WHERE id=?" )
-        arglist.append( (jobtracker.nowstr(), job_row['id']) )
-        jobtracker.execute(queries, arglist)
+                            "updated_at='%s' " \
+                       "WHERE id=%d" % (jobtracker.nowstr(), job_row['id']) )
+        jobtracker.execute(queries)
     except queue_managers.QueueManagerNonFatalError:
         # Do nothing. Don't submit the job. Don't mark the job as 'submitted'.
         # Don't mark the job as 'failed'. The job submission will be retried.

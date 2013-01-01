@@ -68,14 +68,16 @@ def can_request_more():
                         False otherwise.
     """
     # Note: Files are restored in pairs (so we multiply by 2)
-    active_requests = jobtracker.query("SELECT IFNULL(SUM(numrequested)*2, 0) " \
+    active_requests = jobtracker.query("SELECT IFNULL(SUM(numrequested), 0) " \
                                        "FROM requests " \
-                                       "WHERE status='waiting'", fetchone=True)[0]
+                                       "WHERE status='waiting'", fetchone=True)
     to_download = jobtracker.query("SELECT * FROM files " \
                                    "WHERE status NOT IN ('downloaded', " \
                                                         "'added', " \
                                                         "'deleted', " \
                                                         "'terminal_failure')")
+    if active_requests == None:
+	active_requests = 0
     num_to_restore = active_requests
     num_to_download = len(to_download)
     used = get_space_used()
@@ -125,7 +127,7 @@ def get_space_committed():
     reserved = jobtracker.query("SELECT SUM(size) FROM files " \
                                 "WHERE status IN ('downloading', 'new', " \
                                                  "'retrying', 'failed')", \
-                                fetchone=True)[0]
+                                fetchone=True)
     if reserved is None:
         reserved = 0
     return reserved
@@ -164,7 +166,7 @@ def make_request(dbname='default'):
 
     # Ask to restore num_beams
     db = database.Database(dbname)
-    QUERY = "SELECT obs_id FROM full_processing WHERE status='available' LIMIT %d"%num_beams
+    QUERY = "SELECT f.obs_id FROM full_processing as f LEFT JOIN  processing AS p ON f.obs_id = p.obs_id WHERE f.status='available' AND p.details is NULL LIMIT %d"%num_beams
     db.cursor.execute(QUERY)
     obs_ids = [row[0] for row in db.cursor.fetchall()]
 
@@ -179,8 +181,7 @@ def make_request(dbname='default'):
 
     # Mark the beams for restorations
     for obs_id in obs_ids:
-        QUERY = "UPDATE full_processing SET status='requested', guid='%s', \
-		updated_at=NOW() WHERE obs_id=%s"%(guid, obs_id)
+        QUERY = "UPDATE full_processing SET status='requested', guid='%s', updated_at=NOW() WHERE obs_id=%s"%(guid, obs_id)
         db.cursor.execute(QUERY)
     db.conn.close()
 
@@ -233,13 +234,14 @@ def check_active_requests():
 #                     "updated_at='%s' " \
 #                     "WHERE guid='%s'" % (jobtracker.nowstr(), request['guid']))
 
-            query = "SELECT (julianday('%s')-julianday(created_at))*24 " \
-                        "AS deltaT_hours " \
+            query = "SELECT (TO_SECONDS('%s')-TO_SECONDS(created_at)) " \
+                        "AS deltaT_seconds " \
                     "FROM requests " \
                     "WHERE guid='%s'" % \
                         (jobtracker.nowstr(), request['guid'])
             row = jobtracker.query(query, fetchone=True)
-            if row['deltaT_hours'] > config.download.request_timeout:
+            #if row['deltaT_seconds']/3600. > config.download.request_timeout:
+            if row/3600. > config.download.request_timeout:
                 dlm_cout.outs("Restore (GUID: %s) is over %d hr old " \
                                 "and still not ready. Marking " \
                                 "it as failed." % \
@@ -345,6 +347,8 @@ def start_downloads():
                                 "updated_at='%s' " \
                             "WHERE id=%d" % \
                             (jobtracker.nowstr(), file['id']))
+            jobtracker.query(queries)
+            queries = []
             queries.append("INSERT INTO download_attempts (" \
                                 "status, " \
                                 "details, " \
@@ -354,10 +358,9 @@ def start_downloads():
                            "VALUES ('%s', '%s', '%s', '%s', %d)" % \
                            ('downloading', 'Initiated download', jobtracker.nowstr(), \
                                 jobtracker.nowstr(), file['id']))
-            insert_id = jobtracker.query(queries)
+            insert_id = jobtracker.query(queries, fetchone=True)
             attempt = jobtracker.query("SELECT * FROM download_attempts " \
-                                       "WHERE id=%d" % insert_id, \
-                                       fetchone=True)
+                                       "WHERE id=%d" % insert_id, fetchone=True)
     
             # download(attempt)
             DownloadThread(attempt).start()
@@ -376,20 +379,21 @@ def get_num_to_request():
         Outputs:
             num_to_request: The size of the request.
     """
-    ALLOWABLE_REQUEST_SIZES = [1, 3, 5, 10, 15, 20]
+    #ALLOWABLE_REQUEST_SIZES = [1, 3, 5, 8, 12]
+    ALLOWABLE_REQUEST_SIZES = [1, 3, 5, 8]
     avgrate = jobtracker.query("SELECT AVG(files.size/" \
-                                "(JULIANDAY(download_attempts.updated_at) - " \
-                                "JULIANDAY(download_attempts.created_at))) " \
+                                "(TO_SECONDS(download_attempts.updated_at)*1/86400. - " \
+                                "TO_SECONDS(download_attempts.created_at)*1/86400.)) " \
                                "FROM files, download_attempts " \
                                "WHERE files.id=download_attempts.file_id " \
                                     "AND download_attempts.status='downloaded'", \
-                               fetchone=True)[0]
+                               fetchone=True)
     avgsize = jobtracker.query("SELECT AVG(size/numrequested) FROM requests " \
                                "WHERE numbits=%d AND " \
                                     "file_type='%s'" % \
                                 (config.download.request_numbits, \
                                     config.download.request_datatype.lower()), \
-                                fetchone=True)[0]
+                                fetchone=True)
     if avgrate is None or avgsize is None:
         return min(ALLOWABLE_REQUEST_SIZES)
 
@@ -516,7 +520,7 @@ def verify_files():
                                            "FROM download_attempts " \
                                            "WHERE file_id=%s " \
                                            "ORDER BY id DESC " % file['id'], \
-                                           fetchone=True)[0]
+                                           fetchone=True)
                                                 
         queries = []
         if actualsize == expectedsize:
@@ -629,19 +633,19 @@ def status():
 
     numwait = jobtracker.query("SELECT COUNT(*) FROM requests " \
                                "WHERE status='waiting'", \
-                               fetchone=True)[0]
+                               fetchone=True)
     numfail = jobtracker.query("SELECT COUNT(*) FROM requests " \
                                "WHERE status='failed'", \
-                               fetchone=True)[0]
+                               fetchone=True)
     print "Number of requests waiting: %d" % numwait
     print "Number of failed requests: %d" % numfail
 
     numdlactive = jobtracker.query("SELECT COUNT(*) FROM files " \
                                    "WHERE status='downloading'", \
-                                   fetchone=True)[0]
+                                   fetchone=True)
     numdlfail = jobtracker.query("SELECT COUNT(*) FROM files " \
                                  "WHERE status='failed'", \
-                                 fetchone=True)[0]
+                                 fetchone=True)
     print "Number of active downloads: %d" % numdlactive
     print "Number of failed downloads: %d" % numdlfail
 
