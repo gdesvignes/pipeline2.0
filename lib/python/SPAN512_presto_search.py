@@ -485,6 +485,10 @@ def main(filenms, workdir, resultsdir, task='all'):
 	report_fn = os.path.join(job.outputdir, job.basefilenm+"_"+job.task)
 	if job.task_id >= 0:
 	    report_fn+=str(job.task_id)
+
+	# Add the hi accel time 
+	for i in range(nsplit):
+	    job.hi_accelsearch_time += sjob[i].hi_accelsearch_time
         job.write_report(report_fn+".report")
 
     
