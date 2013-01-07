@@ -72,8 +72,8 @@ def find_masked_fraction(obs):
     for line in open(rfifind_out):
         if "Number of  bad   intervals" in line:
             return float(line.split("(")[1].split("%")[0])/100.0
-    # If there is a problem reading the file, return 100%
-    return 100.0
+    # If there is a problem reading the file, return 0%
+    return 0.0
 
 def get_all_subdms(ddplans):
     """
@@ -339,7 +339,7 @@ class obs_info:
         report_file.write("Total wall time:  %.1f s (%.2f hrs)\n"%\
                           (self.total_time, self.total_time/3600.0))
         report_file.write("Fraction of data masked:  %.2f%%\n"%\
-                          (self.masked_fraction*100.0))
+                          (self.masked_fraction))
         report_file.write("Number of candidates folded: %d\n"%\
                           self.num_cands_folded)
         report_file.write("---------------------------------------------------------\n")
