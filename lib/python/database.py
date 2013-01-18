@@ -40,8 +40,15 @@ DATABASES = {
         'HOST': config.commondb.host,
         'DSN':  'FreeTDSDSN'
         },
-    'SPAN512': {
+    'SBON512': {
         'DATABASE': 'SBON512',
+        'UID':  config.commondb.username,
+        'PWD':  config.commondb.password,
+        'HOST': config.commondb.host,
+        'DSN':  'MySQLDSN'
+        },
+    'SPAN512': {
+        'DATABASE': 'SPAN512',
         'UID':  config.commondb.username,
         'PWD':  config.commondb.password,
         'HOST': config.commondb.host,
@@ -51,7 +58,7 @@ DATABASES = {
 
 
 # Set defaults
-DEFAULTDB = 'SPAN512'
+DEFAULTDB = 'SBON512'
 DATABASES['default'] = DATABASES[DEFAULTDB]
 
 
