@@ -16,7 +16,7 @@ dmhit_re = re.compile(r'^ *DM= *(?P<dm>[^ ]*) *SNR= *(?P<snr>[^ ]*) *\** *$')
 candinfo_re = re.compile(r'^(?P<accelfile>.*):(?P<candnum>\d*) *(?P<dm>[^ ]*)' \
                          r' *(?P<snr>[^ ]*) *(?P<sigma>[^ ]*) *(?P<numharm>[^ ]*)' \
                          r' *(?P<ipow>[^ ]*) *(?P<cpow>[^ ]*) *(?P<period>[^ ]*)' \
-                         r' *(?P<r>[^ ]*) *(?P<z>[^ ]*) *\((?P<numhits>\d*)\)$')
+                         r' *(?P<r>[^ ]*) *(?P<z>[^ ]*) *(?P<ipart>[^ ]*) *(?P<npart>[^ ]*) *\((?P<numhits>\d*)\)$')
 
 
 class AccelCand(object):
