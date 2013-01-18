@@ -441,6 +441,57 @@ class NuppiPsrfitsData(PsrfitsData):
     """
     filename_re = re.compile(r'nuppi_(?P<mjd>\d{5})_(?P<source>.*)_' \
                                 r'(?P<scan>\d{6})_(?P<fileno>\d{4}).fits')
+    def __init__(self, fitsfns):
+
+        from formats import psrfits        
+
+        super(NuppiPsrfitsData, self).__init__(fitsfns)
+        self.obstype = 'Nuppi'
+	self.beam_id = 0
+        # Parse filename to get the scan number
+        m = self.fnmatch(fitsfns[0])
+        self.scan_num = m.groupdict()['scan']
+        self.obs_name = m.groupdict()['source']
+        self.num_ifs = self.specinfo.hdus[1].header['NPOL']
+
+	dayfrac = calendar.MJD_to_date(self.timestamp_mjd)[-1]%1
+	self.start_ast = int((dayfrac*24)*3600)
+	self.start_ast %= 24*3600
+
+        self.specinfo = psrfits.SpectraInfo(self.fns)
+        self.original_file = os.path.split(sorted(self.specinfo.filenames)[0])[-1]
+        self.project_id = self.specinfo.project_id
+        self.observers = self.specinfo.observer
+        self.source_name = self.specinfo.source
+        self.center_freq = self.specinfo.fctr
+        self.num_channels_per_record = self.specinfo.num_channels
+        self.channel_bandwidth = self.specinfo.df*1000.0 # In kHz
+        self.sample_time = self.specinfo.dt*1e6 # In microseconds
+        self.sum_id = int(self.specinfo.summed_polns)
+        self.timestamp_mjd = self.specinfo.start_MJD[0]
+        self.start_lst = self.specinfo.start_lst 
+        self.orig_start_az = self.specinfo.azimuth
+        self.orig_start_za = self.specinfo.zenith_ang
+        self.ra_deg = self.specinfo.ra2000
+        self.dec_deg = self.specinfo.dec2000
+        self.right_ascension = float(protractor.convert(self.ra_deg, \
+                                        'deg', 'hmsstr')[0].replace(':', ''))
+        self.declination = float(protractor.convert(self.dec_deg, \
+                                        'deg', 'dmsstr')[0].replace(':', ''))
+        l, b = sextant.equatorial_to_galactic(self.ra_deg, self.dec_deg, \
+                                            'deg', 'deg', J2000=True)
+        self.galactic_longitude = float(l)
+        self.galactic_latitude = float(b)
+
+        self.file_size = int(sum([os.path.getsize(fn) for fn in fitsfns]))
+        self.observation_time = self.specinfo.T
+        self.num_samples = self.specinfo.N
+        self.data_size = self.num_samples * \
+                            self.specinfo.bits_per_sample/8.0 * \
+                            self.num_channels_per_record
+        self.num_samples_per_record = self.specinfo.spectra_per_subint
+        self.header_version = float(self.specinfo.header_version)
+
 
 class NuppiSplitPsrfitsData(PsrfitsData):
     """PSR fits Data object for NUPPI splitted data.
@@ -448,6 +499,57 @@ class NuppiSplitPsrfitsData(PsrfitsData):
     filename_re = re.compile(r'nuppi_(?P<mjd>\d{5})_(?P<source>.*)_' \
                                 r'(?P<scan>\d{6})_(?P<fileno>\d{4})' \
 				r'-part(?P<ipart>\d{1})x(?P<npart>\d{1}).fits')
+    def __init__(self, fitsfns):
+
+        from formats import psrfits        
+
+        super(NuppiSplitPsrfitsData, self).__init__(fitsfns)
+        self.obstype = 'Nuppi'
+	self.beam_id = 0
+        # Parse filename to get the scan number
+        m = self.fnmatch(fitsfns[0])
+        self.scan_num = m.groupdict()['scan']
+        self.obs_name = m.groupdict()['source']
+        self.num_ifs = self.specinfo.hdus[1].header['NPOL']
+
+	dayfrac = calendar.MJD_to_date(self.timestamp_mjd)[-1]%1
+	self.start_ast = int((dayfrac*24)*3600)
+	self.start_ast %= 24*3600
+
+        self.specinfo = psrfits.SpectraInfo(self.fns)
+        self.original_file = os.path.split(sorted(self.specinfo.filenames)[0])[-1]
+        self.project_id = self.specinfo.project_id
+        self.observers = self.specinfo.observer
+        self.source_name = self.specinfo.source
+        self.center_freq = self.specinfo.fctr
+        self.num_channels_per_record = self.specinfo.num_channels
+        self.channel_bandwidth = self.specinfo.df*1000.0 # In kHz
+        self.sample_time = self.specinfo.dt*1e6 # In microseconds
+        self.sum_id = int(self.specinfo.summed_polns)
+        self.timestamp_mjd = self.specinfo.start_MJD[0]
+        self.start_lst = self.specinfo.start_lst 
+        self.orig_start_az = self.specinfo.azimuth
+        self.orig_start_za = self.specinfo.zenith_ang
+        self.ra_deg = self.specinfo.ra2000
+        self.dec_deg = self.specinfo.dec2000
+        self.right_ascension = float(protractor.convert(self.ra_deg, \
+                                        'deg', 'hmsstr')[0].replace(':', ''))
+        self.declination = float(protractor.convert(self.dec_deg, \
+                                        'deg', 'dmsstr')[0].replace(':', ''))
+        l, b = sextant.equatorial_to_galactic(self.ra_deg, self.dec_deg, \
+                                            'deg', 'deg', J2000=True)
+        self.galactic_longitude = float(l)
+        self.galactic_latitude = float(b)
+
+        self.file_size = int(sum([os.path.getsize(fn) for fn in fitsfns]))
+        self.observation_time = self.specinfo.T
+        self.num_samples = self.specinfo.N
+        self.data_size = self.num_samples * \
+                            self.specinfo.bits_per_sample/8.0 * \
+                            self.num_channels_per_record
+        self.num_samples_per_record = self.specinfo.spectra_per_subint
+        self.header_version = float(self.specinfo.header_version)
+
 
 class MockPsrfitsData(PsrfitsData):
     """PSR fits Data object for MockSpec data.
