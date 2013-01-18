@@ -739,6 +739,10 @@ def sifting_job(job):
                 os.rename(psname,
                         job.basefilenm+"_DMs%s_singlepulse.ps" % dmrangestr)
 
+    # Compute a binary summary of all SP candidates
+    cmd = "singlepulse2bin -q -b %s"%job.basefilenm
+    job.singlepulse_time += timed_execute(cmd)
+
     # Recompute the DM list
     dmstrs = []
     for ddplan in job.ddplans:
@@ -972,7 +976,7 @@ def final_clean_up(job):
     # Copy all the important stuff to the output directory
     resultglobs = ["*rfifind.[bimors]*", "*.ps.gz", "*.tgz", "*.png", \
                     "*.zaplist", "search_params.txt", "*.accelcands*", \
-                    "*_merge.out", "candidate_attributes.txt", "*.report"]
+                    "*_merge.out", "candidate_attributes.txt", "*.report", "*singlepulses.bin"]
     
     # Print some info useful for debugging
     print "Contents of workdir (%s) before copy: " % job.workdir
