@@ -14,9 +14,11 @@ import optparse
 import time
 import datetime
 import string
+import tarfile
 
 import debug
 import config.basic
+import config.processing
 
 class PipelineError(Exception):
     """A generic exception to be thrown by the pipeline.
@@ -72,6 +74,22 @@ def clean_up(jobid):
     for fn in fns:
         remove_file(fn)
 
+def copy_results_to_HPSS(results_dir):
+    """Tar all results and copy them to HPSS
+
+    """
+    ar_fn = results_dir+'.tar'
+    tf = tarfile.open(ar_fn, "w:")
+    tf.add(results_dir)
+    tf.close()
+
+    if os.path.exists(ar_fn):
+        os.remove(ar_fn)
+    
+
+    cmd = "rfcp %s %s"%(ar_fn, os.path.join(config.download.datadir, 'results', os.path.split(ar_fn)[-1]))
+    pipe = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE).stdout.read().strip()
+
 def remove_HPSS_file(fn):
     """Delete a file stored on a HPSS file system
 
@@ -80,9 +98,8 @@ def remove_HPSS_file(fn):
 	Outputs:
 	    None
     """
-    cmd = "rfrm %s"%filename
-    pipe = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, 
-stdin=subprocess.PIPE, stderr=subprocess.PIPE).stdout.read().strip()
+    cmd = "rfrm %s"%fn
+    pipe = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE).stdout.read().strip()
 
 
 def remove_file(fn):
@@ -98,8 +115,6 @@ def remove_file(fn):
     import jobtracker
     if config.basic.use_HPSS:
         remove_HPSS_file(fn)
-        raise PipelineError("Deletion of HPSS files not implemented yet!")
-
     else:
 	if os.path.exists(fn):
 	    os.remove(fn)

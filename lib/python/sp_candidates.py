@@ -15,7 +15,6 @@ import sys
 import time
 
 import debug
-import CornellFTP
 import database
 import upload
 import pipeline_utils
@@ -49,7 +48,7 @@ class SinglePulseTarball(upload.FTPable,upload.Uploadable):
         mjd = int(timestamp_mjd)
         self.ftp_path = os.path.join(self.ftp_base,str(mjd))
 
-    def get_upload_sproc_call(self):
+    def get_upload_sproc_call2(self):
         """Return the EXEC spSinglePulseFileUpload string to upload
             this tarball's info to the PALFA common DB.
         """
@@ -62,6 +61,17 @@ class SinglePulseTarball(upload.FTPable,upload.Uploadable):
             "@version_number='%s', " % self.versionnum + \
             "@file_location='%s', " % self.ftp_path + \
             "@uploaded=0"
+        return sprocstr
+
+    def get_upload_sproc_call(self):
+        """Return the EXEC spSinglePulseFileUpload string to upload
+            this tarball's info to the PALFA common DB.
+        """
+        sprocstr = "INSERT INTO SP_Files_Info " + \
+            "(filename, header_id, sp_files_type_id, ftpfilepath, uploaded, version_id) " \
+	    "VALUES ('%s', %d, (SELECT sp_files_type_id FROM SP_Files_Types WHERE sp_files_type='%s'), '%s', 0, (SELECT version_id FROM Versions " \
+            "WHERE version_number='%s' AND pipeline='%s' AND institution='%s'))" %\
+	    (self.filename, self.header_id, self.filetype, self.ftp_path, self.versionnum, config.basic.pipeline, config.basic.institution)
         return sprocstr
 
     def compare_with_db(self, dbname='default'):
@@ -85,9 +95,9 @@ class SinglePulseTarball(upload.FTPable,upload.Uploadable):
                         "v.institution, " \
                         "v.pipeline, " \
                         "v.version_number AS versionnum " \
-                  "FROM sp_files_info AS spf " \
-                  "LEFT JOIN versions AS v ON v.version_id=spf.version_id " \
-                  "LEFT JOIN sp_files_types AS spft " \
+                  "FROM SP_Files_Info AS spf " \
+                  "LEFT JOIN Versions AS v ON v.version_id=spf.version_id " \
+                  "LEFT JOIN SP_Files_Types AS spft " \
                         "ON spft.sp_files_type_id=spf.sp_files_type_id " \
                   "WHERE spft.sp_files_type='%s' AND v.version_number='%s' AND " \
                             "spf.header_id=%d AND v.institution='%s' AND " \
@@ -267,12 +277,10 @@ class SinglePulseBeamPlot(upload.Uploadable):
         """Return the EXEC spSPSingleBeamCandPlotLoader string to
             upload this singlepulse plot to the PALFA common DB.
         """
-        sprocstr = "INSERT INTO SP_Candidate_plots (" \
-            "header_id, sp_plot_type, filename, filedata, institution, " \
-	    "pipeline, version_number) VALUES('%d', '%s', '%s', 0x%s, '%s', '%s', '%s')" \
-	    % (self.header_id, self.sp_plot_type, os.path.split(self.filename)[-1], \
-	    self.filedata.encode('hex'), config.basic.institution, \
-	    config.basic.pipeline, self.versionnum)
+	sprocstr = "INSERT INTO SP_Plots_Single_Beam (header_id, sp_single_beam_plot_type_id, filename, version_id, filedata) " \
+	    "VALUES ('%d', (SELECT sp_single_beam_plot_type_id FROM SP_Single_Beam_Plot_Types WHERE sp_single_beam_plot_type='%s'), " \
+	    "'%s', (SELECT version_id FROM Versions WHERE version_number='%s' AND pipeline='%s' AND institution='%s'), 0x%s)" \
+	    %(self.header_id, self.sp_plot_type, os.path.split(self.filename)[-1], self.versionnum, config.basic.pipeline, config.basic.institution, self.filedata.encode('hex'))
         return sprocstr
 
     def compare_with_db(self, dbname='default'):
@@ -292,13 +300,13 @@ class SinglePulseBeamPlot(upload.Uploadable):
         db.execute("SELECT spsb.header_id, " \
                         "spsbtype.sp_single_beam_plot_type AS sp_plot_type, " \
                         "spsb.filename, " \
-                        "DATALENGTH(spsb.filedata) AS datalen, " \
+                        "LENGTH(spsb.filedata) AS datalen, " \
                         "v.institution, " \
                         "v.pipeline, " \
                         "v.version_number AS versionnum " \
-                    "FROM sp_plots_single_beam AS spsb " \
-                    "LEFT JOIN versions AS v on v.version_id=spsb.version_id " \
-                    "LEFT JOIN sp_single_beam_plot_types AS spsbtype " \
+                    "FROM SP_Plots_Single_Beam AS spsb " \
+                    "LEFT JOIN Versions AS v on v.version_id=spsb.version_id " \
+                    "LEFT JOIN SP_Single_Beam_Plot_Types AS spsbtype " \
                         "ON spsb.sp_single_beam_plot_type_id=spsbtype.sp_single_beam_plot_type_id " \
                     "WHERE spsb.header_id=%d AND v.version_number='%s' AND " \
                             "v.institution='%s' AND v.pipeline='%s' AND " \

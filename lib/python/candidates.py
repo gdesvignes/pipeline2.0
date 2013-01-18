@@ -56,9 +56,6 @@ class PeriodicityCandidate(upload.Uploadable,upload.FTPable):
               'incoherent_power': '%.12g', \
               'num_hits': '%d', \
               'num_harmonics': '%d', \
-              'institution': '%s', \
-              'pipeline': '%s', \
-              'versionnum': '%s', \
               'sigma': '%.12g', \
               'prepfold_sigma': '%.12g', \
               'rescaled_prepfold_sigma': '%.12g', \
@@ -199,19 +196,19 @@ class PeriodicityCandidate(upload.Uploadable,upload.FTPable):
         """Return the EXEC spPDMCandUploaderFindsVersion string to upload
             this candidate to the PALFA common DB.
         """
-	sprocstr = "INSERT INTO PDM_Candidates (" \
+	sprocstr = "INSERT IGNORE INTO PDM_Candidates (" \
 	    "header_id, cand_num, frequency, bary_frequency, period, bary_period, f_dot," \
 	    "bary_f_dot, dm, snr, coherent_power, incoherent_power, num_hits, num_harmonics, "\
-	    "institution, pipeline, version_number, proc_date, presto_sigma, prepfold_sigma," \
-	    "rescaled_prepfold_sigma, sifting_period, sifting_dm) VALUES (" \
+	    "proc_date, presto_sigma, prepfold_sigma," \
+	    "rescaled_prepfold_sigma, sifting_period, sifting_dm, version_id) VALUES (" \
 	    "%d, %d, %.12g, %.12g, %.12g, %.12g, %.12g, %.12g, %.12g, %.12g, %.12g, %.12g," \
-	    "%d, %d, '%s', '%s', '%s', '%s', %.12g, %.12g, %.12g, %.12g, %.12g"%( \
+	    "%d, %d, NOW(), %.12g, %.12g, %.12g, %.12g, %.12g, (SELECT version_id FROM Versions " \
+	    "WHERE version_number='%s' AND pipeline='%s' AND institution='%s'))"%( \
 	    self.header_id, self.cand_num, self.topo_freq, self.bary_freq, self.topo_period, \
 	    self.bary_period, self.topo_f_dot, self.bary_f_dot, self.dm, self.snr, \
 	    self.coherent_power, self.incoherent_power, self.num_hits, self.num_harmonics, \
-	    config.basic.institution, config.basic.pipeline, self.versionnum, \
-	    datetime.date.today().strftime("%Y-%m-%d"), self.sigma, self.prepfold_sigma, \
-	    self.rescaled_prepfold_sigma, self.sifting_period, self.sifting_dm)
+	    self.sigma, self.prepfold_sigma, self.rescaled_prepfold_sigma, self.sifting_period, \
+	    self.sifting_dm, self.versionnum, config.basic.pipeline, config.basic.institution)
         return sprocstr
 
     def compare_with_db(self, dbname='default'):
@@ -250,8 +247,8 @@ class PeriodicityCandidate(upload.Uploadable,upload.FTPable):
                         "c.rescaled_prepfold_sigma as rescaled_prepfold_sigma, " \
                         "c.sifting_period as sifting_period, " \
                         "c.sifting_dm as sifting_dm " \
-                  "FROM pdm_candidates AS c " \
-                  "LEFT JOIN versions AS v ON v.version_id=c.version_id " \
+                  "FROM PDM_Candidates AS c " \
+                  "LEFT JOIN Versions AS v ON v.version_id=c.version_id " \
                   "WHERE c.cand_num=%d AND v.version_number='%s' AND " \
                             "c.header_id=%d " % \
                         (self.cand_num, self.versionnum, self.header_id))
@@ -339,9 +336,9 @@ class PeriodicityCandidatePlot(upload.Uploadable):
         """Return the EXEC spPDMCandPlotUploader string to upload
             this candidate plot to the PALFA common DB.
         """
-	sprocstr = "INSERT INTO PDM_Candidate_plots " \
-	    "(pdm_cand_id, pdm_plot_type, filename, filedata) VALUES (" \
-	    "%d, '%s', '%s', 0x%s"%(self.cand_id, self.plot_type, \
+	sprocstr = "INSERT IGNORE INTO PDM_Candidate_plots " \
+	    "(pdm_cand_id, pdm_plot_type_id, filename, filedata) VALUES (" \
+	    "%d, (SELECT pdm_plot_type_id FROM PDM_Plot_types WHERE pdm_plot_type='%s'), '%s', 0x%s)"%(self.cand_id, self.plot_type, \
 	    os.path.split(self.filename)[-1], self.filedata.encode('hex'))
         return sprocstr
 
@@ -360,15 +357,16 @@ class PeriodicityCandidatePlot(upload.Uploadable):
             db = dbname
         else:
             db = database.Database(dbname)
-        db.execute("SELECT plt.pdm_cand_id AS cand_id, " \
+	QUERY = "SELECT plt.pdm_cand_id AS cand_id, " \
                         "pltype.pdm_plot_type AS plot_type, " \
                         "plt.filename, " \
-                        "DATALENGTH(plt.filedata) AS datalen " \
-                   "FROM pdm_candidate_plots AS plt " \
-                   "LEFT JOIN pdm_plot_types AS pltype " \
+                        "LENGTH(plt.filedata) AS datalen " \
+                   "FROM PDM_Candidate_plots AS plt " \
+                   "LEFT JOIN PDM_Plot_types AS pltype " \
                         "ON plt.pdm_plot_type_id=pltype.pdm_plot_type_id " \
                    "WHERE plt.pdm_cand_id=%d AND pltype.pdm_plot_type='%s' " % \
-                        (self.cand_id, self.plot_type))
+                        (self.cand_id, self.plot_type)
+        db.execute(QUERY)
         rows = db.cursor.fetchall()
         if type(dbname) == types.StringType:
             db.close()
@@ -441,9 +439,9 @@ class PeriodicityCandidateBinary(upload.FTPable,upload.Uploadable):
         """Return the EXEC spPFDBLAH string to upload
             this binary's info to the PALFA common DB.
         """
-        sprocstr = "INSERT INTO PDM_Candidate_Binaries_Filesystem " + \
-	    "(pdm_cand_id, pdm_plot_type, filename, file_location, uploaded) VALUES (" \
-	    "%d, '%s', '%s', '%s', 0)"%(self.cand_id, self.filetype, self.filename, self.ftp_path)
+        sprocstr = "INSERT IGNORE INTO PDM_Candidate_Binaries_Filesystem " + \
+	    "(pdm_cand_id, pdm_plot_type_id, filename, file_location, uploaded) VALUES (" \
+	    "%d, (SELECT pdm_plot_type_id FROM PDM_Plot_types WHERE pdm_plot_type='%s'), '%s', '%s', 0)"%(self.cand_id, self.filetype, self.filename, self.ftp_path)
         return sprocstr
 
     def compare_with_db(self,dbname='default'):
@@ -460,15 +458,16 @@ class PeriodicityCandidateBinary(upload.FTPable,upload.Uploadable):
             db = dbname
         else:
             db = database.Database(dbname)
-        db.execute("SELECT bin.pdm_cand_id AS cand_id, " \
+        QUERY = "SELECT bin.pdm_cand_id AS cand_id, " \
                         "pltype.pdm_plot_type AS filetype, " \
                         "bin.filename, " \
                         "bin.file_location AS ftp_path " \
                    "FROM PDM_Candidate_Binaries_Filesystem AS bin " \
-                   "LEFT JOIN pdm_plot_types AS pltype " \
+                   "LEFT JOIN PDM_Plot_types AS pltype " \
                         "ON bin.pdm_plot_type_id=pltype.pdm_plot_type_id " \
                    "WHERE bin.pdm_cand_id=%d AND pltype.pdm_plot_type='%s' " % \
-                        (self.cand_id, self.filetype))
+                        (self.cand_id, self.filetype)
+        db.execute(QUERY)
         rows = db.cursor.fetchall()
         if type(dbname) == types.StringType:
             db.close()
@@ -602,9 +601,10 @@ class PeriodicityCandidateRating(upload.Uploadable):
         if debug.UPLOAD: 
             starttime = time.time()
 
-        #super(PeriodicityCandidateRating, self).upload(dbname=dbname, \
-        #            *args, **kwargs)
-        dbname.execute(self.get_upload_sproc_call())
+        super(PeriodicityCandidateRating, self).upload(dbname=dbname, \
+                    *args, **kwargs)
+
+        #dbname.execute(self.get_upload_sproc_call())
         self.compare_with_db(dbname=dbname)
         
         if debug.UPLOAD:
@@ -633,11 +633,11 @@ class PeriodicityCandidateRating(upload.Uploadable):
             instance_id = self.inst_cache.get_id(ratval.name, ratval.version, \
                                             ratval.description)
             if value is None or np.isnan(value):
-                query += "SELECT NULL, %d, %d, GETDATE() UNION ALL " % \
+                query += "SELECT NULL, %d, %d, NOW() UNION ALL " % \
                          (instance_id, \
                           self.cand_id)
             else:
-                query += "SELECT '%.12g', %d, %d, GETDATE() UNION ALL " % \
+                query += "SELECT '%.12g', %d, %d, NOW() UNION ALL " % \
                         (value, \
                          instance_id, \
                          self.cand_id)
@@ -770,7 +770,7 @@ def get_candidates(versionnum, directory, header_id=None, timestamp_mjd=None, in
     attribs = np.loadtxt(attrib_fn,dtype='S')
         
     # Create temporary directory
-    tempdir = tempfile.mkdtemp(suffix="_tmp", prefix="PALFA_pfds_")
+    tempdir = tempfile.mkdtemp(suffix="_tmp", prefix="pfds_", dir="/sps/hep/glast/data/survey_pulsar/")
 
     if foldedcands:
 

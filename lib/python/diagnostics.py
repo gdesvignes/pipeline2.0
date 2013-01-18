@@ -17,6 +17,7 @@ import time
 
 import numpy as np
 
+import rfifind
 import debug
 import database
 import upload
@@ -87,7 +88,7 @@ class FloatDiagnostic(Diagnostic):
         self.value = None # The diagnostic value to upload
         self.get_diagnostic()
 
-    def get_upload_sproc_call(self):
+    def get_upload_sproc_call2(self):
         sprocstr = "EXEC spDiagnosticAdder " \
             "@obs_name='%s', " % self.obs_name + \
             "@beam_id=%d, " % self.beam_id + \
@@ -98,6 +99,23 @@ class FloatDiagnostic(Diagnostic):
             "@diagnostic_type_description='%s', " % self.description + \
             "@diagnostic=%.12g, " % self.value + \
             "@obsType='%s'" % self.obstype.lower()
+        return sprocstr
+
+    def get_upload_sproc_call2(self):
+	sprocstr = "INSERT INTO Diagnostics " \
+	    "(header_id, diagnostic_type_id, diagnostic_value, version_id) VALUES " \
+	    "((SELECT header_id FROM Headers LEFT JOIN Observations AS H obs ON obs.obs_id=h.obs_id WHERE obs_name='%s'), (SELECT diagnostic_type_id " \
+	    "FROM Diagnostic_types WHERE diagnostic_type_description='%s'), '%s', " \
+	    "(SELECT version_id FROM Versions WHERE version_number='%s' AND pipeline='%s' AND institution='%s'))"% \
+	    (self.obs_name, self.description, self.value, self.version_number, config.basic.pipeline, config.basic.institution)
+        return sprocstr
+
+    def get_upload_sproc_call(self):
+	if self.value == None:
+		print self.name, self.value, self.obs_name
+	sprocstr = "CALL spDiagnosticAdder " \
+	    "('%s', %d, '%s', '%s', '%s', '%s', %.12g)"% \
+	    (self.obs_name, self.beam_id, config.basic.institution, config.basic.pipeline, self.version_number, self.name, self.value)
         return sprocstr
 
     def compare_with_db(self, dbname='default'):
@@ -114,7 +132,7 @@ class FloatDiagnostic(Diagnostic):
             db = dbname
         else:
             db = database.Database(dbname)
-        db.execute("SELECT obs.obs_name, " \
+        QUERY = "SELECT obs.obs_name, " \
                         "h.beam_id, " \
                         "v.institution, " \
                         "v.pipeline, " \
@@ -123,12 +141,12 @@ class FloatDiagnostic(Diagnostic):
                         "dtype.diagnostic_type_description AS description, " \
                         "d.diagnostic_value AS value, " \
                         "h.obsType AS obstype " \
-                   "FROM diagnostics AS d " \
-                   "LEFT JOIN diagnostic_types AS dtype " \
+                   "FROM Diagnostics AS d " \
+                   "LEFT JOIN Diagnostic_types AS dtype " \
                         "ON dtype.diagnostic_type_id=d.diagnostic_type_id " \
-                   "LEFT JOIN headers AS h ON h.header_id=d.header_id " \
-                   "LEFT JOIN observations AS obs ON obs.obs_id=h.obs_id " \
-                   "LEFT JOIN versions AS v ON v.version_id=d.version_id " \
+                   "LEFT JOIN Headers AS h ON h.header_id=d.header_id " \
+                   "LEFT JOIN Observations AS obs ON obs.obs_id=h.obs_id " \
+                   "LEFT JOIN Versions AS v ON v.version_id=d.version_id " \
                    "WHERE obs.obs_name='%s' AND h.beam_id=%d " \
                         "AND v.institution='%s' AND v.version_number='%s' " \
                         "AND v.pipeline='%s' AND h.obsType='%s' " \
@@ -136,7 +154,8 @@ class FloatDiagnostic(Diagnostic):
                         "AND dtype.diagnostic_type_description='%s' " % \
                         (self.obs_name, self.beam_id, config.basic.institution, \
                             self.version_number, config.basic.pipeline, \
-                            self.obstype.lower(), self.name, self.description))
+                            self.obstype.lower(), self.name, self.description)
+        db.execute(QUERY)
         rows = db.cursor.fetchall()
         if type(dbname) == types.StringType:
             db.close()
@@ -208,7 +227,7 @@ class PlotDiagnostic(Diagnostic):
         self.datalen = None # The number of bytes in the binary file
         self.get_diagnostic()
 
-    def get_upload_sproc_call(self):
+    def get_upload_sproc_call2(self):
         sprocstr = "EXEC spDiagnosticPlotAdder " \
             "@obs_name='%s', " % self.obs_name + \
             "@beam_id=%d, " % self.beam_id + \
@@ -221,6 +240,13 @@ class PlotDiagnostic(Diagnostic):
             "@diagnostic_plot=0x%s, " % self.filedata.encode('hex') + \
             "@obsType='%s'" % self.obstype
         return sprocstr
+
+    def get_upload_sproc_call(self):
+        sprocstr = "CALL spDiagnosticPlotAdder " \
+	    "('%s', %d, '%s', '%s', '%s', '%s', '%s', 0x%s)"% \
+	    (self.obs_name, self.beam_id, config.basic.institution, config.basic.pipeline, self.version_number, self.name, os.path.split(self.value)[-1], self.filedata.encode('hex'))
+        return sprocstr
+
 
     def compare_with_db(self, dbname='default'):
         """Grab corresponding diagnostic plot from DB and compare values.
@@ -236,7 +262,7 @@ class PlotDiagnostic(Diagnostic):
             db = dbname
         else:
             db = database.Database(dbname)
-        db.execute("SELECT obs.obs_name, " \
+        QUERY = "SELECT obs.obs_name, " \
                         "h.beam_id, " \
                         "v.institution, " \
                         "v.pipeline, " \
@@ -244,14 +270,14 @@ class PlotDiagnostic(Diagnostic):
                         "dtype.diagnostic_plot_type_name AS name, " \
                         "dtype.diagnostic_plot_type_description AS description, " \
                         "d.filename AS value, " \
-                        "DATALENGTH(d.diagnostic_plot) AS datalen, " \
+                        "LENGTH(d.diagnostic_plot) AS datalen, " \
                         "h.obsType AS obstype " \
-                   "FROM diagnostic_plots AS d " \
-                   "LEFT JOIN diagnostic_plot_types AS dtype " \
+                   "FROM Diagnostic_plots AS d " \
+                   "LEFT JOIN Diagnostic_plot_types AS dtype " \
                         "ON dtype.diagnostic_plot_type_id=d.diagnostic_plot_type_id " \
-                   "LEFT JOIN headers AS h ON h.header_id=d.header_id " \
-                   "LEFT JOIN observations AS obs ON obs.obs_id=h.obs_id " \
-                   "LEFT JOIN versions AS v ON v.version_id=d.version_id " \
+                   "LEFT JOIN Headers AS h ON h.header_id=d.header_id " \
+                   "LEFT JOIN Observations AS obs ON obs.obs_id=h.obs_id " \
+                   "LEFT JOIN Versions AS v ON v.version_id=d.version_id " \
                    "WHERE obs.obs_name='%s' AND h.beam_id=%d " \
                         "AND v.institution='%s' AND v.version_number='%s' " \
                         "AND v.pipeline='%s' AND h.obsType='%s' " \
@@ -259,7 +285,8 @@ class PlotDiagnostic(Diagnostic):
                         "AND dtype.diagnostic_plot_type_description='%s' " % \
                         (self.obs_name, self.beam_id, config.basic.institution, \
                             self.version_number, config.basic.pipeline, \
-                            self.obstype.lower(), self.name, self.description))
+                            self.obstype.lower(), self.name, self.description)
+        db.execute(QUERY)
         rows = db.cursor.fetchall()
         if type(dbname) == types.StringType:
             db.close()
@@ -314,11 +341,11 @@ class RFIPercentageDiagnostic(FloatDiagnostic):
     
     maskpcnt_re = re.compile(r"Number of  bad   intervals:.*\((?P<masked>.*)%\)")
 
-    def get_diagnostic(self):
+    def get_diagnostic2(self):
         # find *rfifind.out file
         rfiouts = glob.glob(os.path.join(self.directory, "*rfifind.out"))
 
-        if len(rfiouts) != 1:
+        if len(rfiouts) > 3:
             raise DiagnosticError("Wrong number of rfifind output files found (%d)!" % \
                                     len(rfiouts))
         rfifile = open(rfiouts[0], 'r')
@@ -329,6 +356,15 @@ class RFIPercentageDiagnostic(FloatDiagnostic):
                 break
         rfifile.close()
 
+    def get_diagnostic(self):
+        # find *rfifind.out file
+        rfimask_fn = glob.glob(os.path.join(self.directory, "*%s_rfifind.mask"%os.path.split(self.directory)[-1]))[0]
+
+	mask = rfifind.rfifind(rfimask_fn)
+	zaps = 0
+	for integ in mask.mask_zap_chans_per_int:
+	    zaps += len(integ)
+	self.value = 100. * zaps/ float(mask.nchan * mask.nint)
 
 class RFIPlotDiagnostic(PlotDiagnostic):
     name = "RFIfind png"
@@ -338,7 +374,7 @@ class RFIPlotDiagnostic(PlotDiagnostic):
         # find *rfifind.png file
         rfipngs = glob.glob(os.path.join(self.directory, '*rfifind.png'))
 
-        if len(rfipngs) != 1:
+        if len(rfipngs) > 3:
             raise DiagnosticError("Wrong number of rfifind pngs found (%d)!" % \
                                 len(rfipngs))
         else:
@@ -350,7 +386,7 @@ class RFIPlotDiagnostic(PlotDiagnostic):
 
 
 class PeriodicitySummaryPlotDiagnostic(PlotDiagnostic):
-    name = "Periodicty summary plot"
+    name = "Periodicity summary plot"
     description = "A plot summarizing all periodicity candidates " \
                   "generated by accelsearch in png format."
 

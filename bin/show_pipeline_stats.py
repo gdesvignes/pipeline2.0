@@ -96,15 +96,15 @@ class PipelineStatsFigure(matplotlib.figure.Figure):
         
 
 def get_data():
-    create_times = jobtracker.query("SELECT DATETIME(created_at) FROM jobs")
+    create_times = jobtracker.query("SELECT (created_at) FROM jobs")
 
-    upload_times = jobtracker.query("SELECT DATETIME(updated_at) FROM jobs " \
+    upload_times = jobtracker.query("SELECT (updated_at) FROM jobs " \
                                         "WHERE status='uploaded'")
 
-    fail_times = jobtracker.query("SELECT DATETIME(updated_at) FROM jobs " \
+    fail_times = jobtracker.query("SELECT (updated_at) FROM jobs " \
                                         "WHERE status='terminal_failure'")
 
-    restore_times = jobtracker.query("SELECT DATETIME(created_at) FROM requests")
+    restore_times = jobtracker.query("SELECT (created_at) FROM requests")
     restore_sizes = jobtracker.query("SELECT numrequested FROM requests")
     rows = jobtracker.query("SELECT status FROM requests")
     restore_status = []
@@ -117,14 +117,16 @@ def get_data():
             restore_status.append((0,0,1)) # Blue
 
     bytes_downloaded = jobtracker.query("SELECT files.size, " \
-                                            "MAX(DATETIME(download_attempts.updated_at)) " \
+                                            "MAX((download_attempts.updated_at)) " \
                                         "FROM files, download_attempts " \
                                         "WHERE files.id=download_attempts.file_id " \
                                             "AND download_attempts.status IN ('downloaded', 'added') " \
                                         "GROUP BY files.id")
-    bytes_deleted = jobtracker.query("SELECT -size, DATETIME(updated_at) " \
+    bytes_deleted = jobtracker.query("SELECT -size, (updated_at) " \
                                           "FROM files " \
                                           "WHERE status='deleted'")
+
+    print bytes_downloaded, bytes_deleted
 
     mkdatetime = lambda dt: datetime.datetime.strptime(dt, '%Y-%m-%d %H:%M:%S')
 

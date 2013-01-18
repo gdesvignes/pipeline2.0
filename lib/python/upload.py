@@ -30,7 +30,7 @@ class Uploadable(object):
         raise NotImplementedError("get_upload_sproc_call() should be defined by a " \
                                   "subclass of Uploadable.")
     
-    def upload(self, dbname='default'):
+    def upload(self, dbname='SPAN512'):
         """Upload an Uploadable to the desired database.
             
             Input:
@@ -46,6 +46,7 @@ class Uploadable(object):
         query = str(self.get_upload_sproc_call())
         try:
             db.cursor.execute(query)
+	    #db.commit()
         except Exception, e:
             if "has been chosen as the deadlock victim. Rerun the transaction." in str(e):
                 raise UploadDeadlockError("There was a deadlock error executing "\
@@ -54,6 +55,7 @@ class Uploadable(object):
                 raise UploadError("There was an error executing the following " \
                                 "query: %s" % query[:256])
         try:
+            db.cursor.execute("SELECT LAST_INSERT_ID()")
             result = db.cursor.fetchone()
         except Exception, e:
             if "has been chosen as the deadlock victim. Rerun the transaction." in str(e):

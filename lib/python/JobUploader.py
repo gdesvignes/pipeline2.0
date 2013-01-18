@@ -16,7 +16,7 @@ import jobtracker
 import database
 import upload
 import pipeline_utils
-import CornellFTP
+import NancayFTP
 import config.upload
 import config.basic
 import ratings2.utils
@@ -41,7 +41,7 @@ def run():
         # Get the job's most recent submit
         submit = jobtracker.query("SELECT * FROM job_submits " \
                                   "WHERE job_id=%d " \
-                                    "AND status='finished' " \
+                                    "AND status='processed' " \
                                   "ORDER BY id DESC" % job['id'], fetchone=True)
         print "Upload %d of %d" % (ii+1, len(finished_jobs))
         upload_results(submit)
@@ -92,7 +92,7 @@ def upload_results(job_submit):
         starttime = time.time()
     try:
         # Connect to the DB
-        db = database.Database('default', autocommit=False)
+        db = database.Database('SPAN512', autocommit=False)
         # Prepare for upload
         dir = job_submit['output_dir']
         if not os.path.exists(dir) or not os.listdir(dir):
@@ -111,7 +111,7 @@ def upload_results(job_submit):
         
         print "\tHeader parsed."
 
-        rat_inst_id_cache = ratings2.utils.RatingInstanceIDCache(dbname='common2')
+        rat_inst_id_cache = ratings2.utils.RatingInstanceIDCache(dbname='nancay')
         cands, tempdir = candidates.get_candidates(version_number, dir, \
                                                    timestamp_mjd=data.timestamp_mjd, \
                                                    inst_cache=rat_inst_id_cache)
@@ -158,21 +158,19 @@ def upload_results(job_submit):
         arglists = []
         queries.append("UPDATE job_submits " \
                        "SET status='upload_failed', " \
-                            "details=?, " \
-                            "updated_at=? " \
-                       "WHERE id=?")
-        arglists.append((errormsg, jobtracker.nowstr(), job_submit['id']))
+                            "details=\"%s\", " \
+                            "updated_at='%s' " \
+                       "WHERE id=%d"%(errormsg.replace("\"","\'"), jobtracker.nowstr(), job_submit['id']))
         queries.append("UPDATE jobs " \
                        "SET status='failed', " \
                             "details='Error while uploading results', " \
-                            "updated_at=? " \
-                       "WHERE id=?")
-        arglists.append((jobtracker.nowstr(), job_submit['job_id']))
-        jobtracker.execute(queries, arglists)
+                            "updated_at='%s' " \
+                       "WHERE id=%d"%(jobtracker.nowstr(), job_submit['job_id']))
+        jobtracker.query(queries)
         
         # Rolling back changes. 
         db.rollback()
-    except (database.DatabaseConnectionError, CornellFTP.CornellFTPTimeout,\
+    except (database.DatabaseConnectionError, \
                upload.UploadDeadlockError, database.DatabaseDeadlockError), e:
         # Connection error while uploading. We will try again later.
         sys.stderr.write(str(e))
@@ -194,13 +192,14 @@ def upload_results(job_submit):
 
         #FTP any FTPables
         attempts = 0
+	"""
         while attempts < 5:
             try:
-                cftp = CornellFTP.CornellFTP()
+                cftp = NancayFTP.NancayFTP()
                 hdr.upload_FTP(cftp,db)
                 cftp.quit()
 
-            except CornellFTP.CornellFTPTimeout:
+            except NancayFTP.NancayFTPTimeout:
                 # Connection error during FTP upload. Reconnect and try again.
                 print "FTP connection lost. Reconnecting..."
                 attempts += 1
@@ -217,6 +216,7 @@ def upload_results(job_submit):
                 print "\tFTP upload completed successfully. header_id=%d" % \
                         header_id
                 break
+	"""
 
         # remove temporary dir for PFDs
         shutil.rmtree(tempdir)
@@ -249,6 +249,10 @@ def upload_results(job_submit):
 
 	    print "Results successfully uploaded"
 
+	    # Tar and Copy final results to HPSS
+	    print "Copy results to HPSS"
+	    pipeline_utils.copy_results_to_HPSS(dir)
+
 	    if config.basic.delete_rawdata:
 		pipeline_utils.clean_up(job_submit['job_id'])
 
@@ -260,6 +264,7 @@ def upload_results(job_submit):
 		for k in sorted(upload.upload_timing_summary.keys()):
 		    print "    %s: %.2f s" % (k, upload.upload_timing_summary[k])
 	    print "" # Just a blank line
+
        
 
 def get_fitsfiles(job_submit):

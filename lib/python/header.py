@@ -40,10 +40,6 @@ class Header(upload.Uploadable,upload.FTPable):
               'channel_bandwidth': '%f', \
               'num_channels_per_record': '%d', \
               'num_ifs': '%d', \
-              'orig_right_ascension': '%.4f', \
-              'orig_declination': '%.4f', \
-              'orig_galactic_longitude': '%.8f', \
-              'orig_galactic_latitude': '%.8f', \
               'source_name': '%s', \
               'start_ast': '%.8f', \
               'start_lst': '%.8f', \
@@ -52,8 +48,6 @@ class Header(upload.Uploadable,upload.FTPable):
               'file_size': '%d', \
               'data_size': '%d', \
               'num_samples': '%d', \
-              'orig_ra_deg': '%.8f', \
-              'orig_dec_deg': '%.8f', \
               'right_ascension': '%.4f', \
               'declination': '%.4f', \
               'galactic_longitude': '%.8f', \
@@ -154,12 +148,12 @@ class Header(upload.Uploadable,upload.FTPable):
             "@header_version=%.3f" % self.header_version
         return sprocstr
 
-    def get_upload_sproc_call(self):
+    def get_upload_sproc_call3(self):
         """Return the INSERT command to
 	execute to the common DB.
         """
-        sprocstr = "INSERT INTO spHeaderLoader (" \
-            "obs_name, "  \
+        sprocstr = "BEGIN; INSERT INTO Observations (obs_name) VALUES ('%s'); INSERT INTO Headers (" \
+            "obs_id, "  \
             "beam_id, "  \
             "original_wapp_file, " \
             "sample_time, "  \
@@ -170,10 +164,6 @@ class Header(upload.Uploadable,upload.FTPable):
             "channel_bandwidth, " \
             "num_channels_per_record, " \
             "num_ifs, " \
-            "orig_right_ascension, " \
-            "orig_declination, " \
-            "orig_galactic_longitude, " \
-            "orig_galactic_latitude= " \
             "source_name, " \
             "sum_id, " \
             "orig_start_az, " \
@@ -185,8 +175,6 @@ class Header(upload.Uploadable,upload.FTPable):
             "file_size, " \
             "data_size, "  \
             "num_samples, " \
-            "orig_ra_deg, " \
-            "orig_dec_deg, " \
             "right_ascension, " \
             "declination, " \
             "galactic_longitude, " \
@@ -194,15 +182,32 @@ class Header(upload.Uploadable,upload.FTPable):
             "ra_deg, " \
             "dec_deg, " \
             "obsType, " \
-            "header_version) VALUES (" \ 
-	    "'%s', %d, '%s', %f, %f, %.10f, %d, %f, %f, %d, %d, %.4f, %.4f, %.8f, %.8f, '%s', %d, " \
-	    "%.4f, %.4f, %.8f, %.8f, '%s', '%s', %d, %d,%d, %.8f, %.8f, %.4f, %.4f, %.8f, %.8f, %.8f, %.8f, %s, %.3f)"%( \
-	    self.obs_name, sself.beam_id, self.original_file, self.sample_time, self.observation_time, \
+            "header_version) VALUES (" \
+	    "(SELECT LAST_INSERT_ID()), %d, '%s', %f, %f, %.10f, %d, %f, %f, %d, %d, '%s', %d, " \
+	    "%.4f, %.4f, %.8f, %.8f, '%s', '%s', %d, %d,%d, %.4f, %.4f, %.8f, %.8f, %.8f, %.8f, '%s', %.3f); COMMIT;"%( \
+	    self.obs_name, self.beam_id, self.original_file, self.sample_time, self.observation_time, \
 	    self.timestamp_mjd, self.num_samples_per_record, self.center_freq, self.channel_bandwidth, \
-	    self.num_channels_per_record, self.num_ifs, self.orig_right_ascension, self.orig_declination, \
-	    self.orig_galactic_longitude, self.orig_galactic_latitude, self.source_name, self.sum_id, \
+	    self.num_channels_per_record, self.num_ifs, \
+	    self.source_name, self.sum_id, \
 	    self.orig_start_az, self.orig_start_za, self.start_ast, self.start_lst, self.project_id, \
-	    self.observers, self.file_size, self.data_size, self.num_samples, self.orig_ra_deg, self.orig_dec_deg, \
+	    self.observers, self.file_size, self.data_size, self.num_samples, \
+	    self.right_ascension, self.declination, self.galactic_longitude, self.galactic_latitude, \
+	    self.ra_deg, self.dec_deg, self.obstype, self.header_version)
+        return sprocstr
+
+    def get_upload_sproc_call(self):
+        """Return the INSERT command to
+	execute to the common DB.
+        """
+	sprocstr = "CALL spHeaderLoader " \
+	    "('%s', %d, '%s', %f, %f, %.10f, %d, %f, %f, %d, %d, '%s', %d, " \
+	    "%.4f, %.4f, %.8f, %.8f, '%s', '%s', %d, %d,%d, %.4f, %.4f, %.8f, %.8f, %.8f, %.8f, '%s', %.3f)"%( \
+	    self.obs_name, self.beam_id, self.original_file, self.sample_time, self.observation_time, \
+	    self.timestamp_mjd, self.num_samples_per_record, self.center_freq, self.channel_bandwidth, \
+	    self.num_channels_per_record, self.num_ifs, \
+	    self.source_name, self.sum_id, \
+	    self.orig_start_az, self.orig_start_za, self.start_ast, self.start_lst, self.project_id, \
+	    self.observers, self.file_size, self.data_size, self.num_samples, \
 	    self.right_ascension, self.declination, self.galactic_longitude, self.galactic_latitude, \
 	    self.ra_deg, self.dec_deg, self.obstype, self.header_version)
         return sprocstr
@@ -232,10 +237,6 @@ class Header(upload.Uploadable,upload.FTPable):
                           "h.channel_bandwidth, " \
                           "h.num_channels_per_record, " \
                           "h.num_ifs, " \
-                          "h.orig_right_ascension, " \
-                          "h.orig_declination, " \
-                          "h.orig_galactic_longitude, " \
-                          "h.orig_galactic_latitude, " \
                           "h.source_name, " \
                           "h.sum_id, " \
                           "h.orig_start_az, " \
@@ -247,8 +248,6 @@ class Header(upload.Uploadable,upload.FTPable):
                           "h.file_size, " \
                           "h.data_size, " \
                           "h.num_samples, " \
-                          "h.orig_ra_deg, " \
-                          "h.orig_dec_deg, " \
                           "h.right_ascension, " \
                           "h.declination, " \
                           "h.galactic_longitude, " \
@@ -257,8 +256,8 @@ class Header(upload.Uploadable,upload.FTPable):
                           "h.dec_deg, " \
                           "h.obsType  AS obstype, " \
                           "h.header_version as header_version " \
-                   "FROM headers AS h " \
-                   "LEFT JOIN observations AS obs ON obs.obs_id=h.obs_id " \
+                   "FROM Headers AS h " \
+		   "LEFT JOIN Observations AS obs ON obs.obs_id=h.obs_id " \
                    "WHERE obs.obs_name='%s' AND h.beam_id=%d " % \
                         (self.obs_name, self.beam_id))
         rows = db.cursor.fetchall()
